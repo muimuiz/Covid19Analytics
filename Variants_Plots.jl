@@ -1,5 +1,3 @@
-include("CommonDefs.jl")
-
 module Variants_Plots
 
 using Logging
@@ -23,6 +21,9 @@ using ..CommonDefs
 @info pwd()
 
 @info "========"
+@info "定数"
+
+@info "--------"
 @info "解析データ"
 
 const input_jld2_filepaths = Dict(
@@ -31,19 +32,74 @@ const input_jld2_filepaths = Dict(
 )
 @info "input_jld2_filepaths", input_jld2_filepaths
 
+@info "--------"
+@info "プロットする変異株"
+
+const variant_names_to_be_plotted = [
+#    "BA.2",
+#    "BA.2.75",
+    "BA.5",
+    "BF.7",
+    "BN.1",
+#    "BQ.1",
+    "BQ.1.1",
+    "XBB",
+    "XBB.1.5",
+    "XBB.1.9.1",
+    "XBB+1.9.1",
+]
+@info "variant_names_to_be_plotted", variant_names_to_be_plotted
+
+@info "--------"
+@info "プロット時間範囲"
+
+const plot_earliest_start_date = Date("2022-10-31")
+const plot_latest_end_date     = Date("2023-06-02")
+@info "plot_earliest_start_date", plot_earliest_start_date
+@info "plot_latest_end_date", plot_latest_end_date
+
+@info "--------"
+@info "画像出力ディレクトリ"
+
+const figdir = "CurrentFigs/"
+@info "figdir", figdir
+
+@info "--------"
+@info "描画色"
+
+RGB256(r, g, b) = RGB(r/255, g/255, b/255)
+const cols = Dict(
+    "BA.2"      => RGB256(236, 126,  42),
+    "BA.5"      => RGB256(156, 196, 230),
+    "BF.7"      => RGB256(255, 192,   0),
+    "BN.1"      => RGB256(196,  90,  16),
+    "BQ.1.1"    => RGB256( 46, 116, 182),
+    "BA.2.75"   => RGB256(255, 104, 214),
+    "BQ.1"      => RGB256(168, 208, 142),
+    "XBB"       => RGB256(132, 152, 176),
+    "XBB.1.5"   => RGB256(112,  44, 160),
+    "XBB.1.9.1" => RGB256( 84, 132,  52),
+    "XBB+1.9.1" => RGB256( 98,  88, 106),
+)
+@info "length(cols)", length(cols)
+
 @info "========"
 @info "関数定義"
+
+@info "--------"
+@info "データ読み込み用関数"
 
 function load_jld2(filepath)
     jld2_data = load(filepath)
     D = Dict{Symbol,Any}()
-    for k in keys(jld2_data)
+    for k ∈ keys(jld2_data)
         D[Symbol(k)] = jld2_data[k]
     end
     variants_df = D[:variants_df]
     logitreg_df = D[:logitreg_df]
     return variants_df, logitreg_df
 end
+@info load_jld2
 
 #=
 for key in keys(D)
@@ -53,8 +109,41 @@ for key in keys(D)
 end
 =#
 
-@info "========"
-@info "プロット"
+@info "--------"
+@info "時刻区間代表値計算用関数"
+
+@inline λ_logistic(t, α, β) = α + β * t
+@info λ_logistic
+
+function λ_star(λs, λe)
+    if λs == λe return λs end 
+    if λs + λe ≤ 0.0
+        if λs > -300.0 || λe > -300.0
+            return logit((softplus(λe) - softplus(λs)) / (λe - λs))
+        else
+            return logsubexp(λe, λs) - log(abs(λe - λs)) # 近似式
+            #return log1mexp(-abs(λe - λs)) - log(abs(λe - λs)) + max(λs, λe)
+        end
+    end
+    return -λ_star(-λs, -λe)
+end
+@info λ_star
+
+function t_star(ts, te, α, β)
+    @assert ts < te
+    if 1e-12 < abs(β)
+        λ = λ_star(λ_logistic(ts, α, β), λ_logistic(te, α, β))
+        t = (λ - α) / β
+    else
+        t = (ts + te) / 2.0
+    end
+    @assert ts ≤ t ≤ te
+    return t
+end
+@info t_star
+
+@info "--------"
+@info "プロット用関数"
 
 UPlot = Union{Plots.Plot,Plots.Subplot}
 
@@ -67,11 +156,11 @@ function _rl_pos(l::Tuple, r; logscale=false)
     end
     return a
 end
-rx(p::UPlot, r; logscale=false) = _rl_pos(Plots.xlims(p), r; logscale=logscale)
-ry(p::UPlot, r; logscale=false) = _rl_pos(Plots.ylims(p), r; logscale=logscale)
-
-const plot_earliest_start_date = Date("2022-10-31")
-const plot_latest_end_date     = Date("2023-06-02")
+@info _rl_pos
+@inline rx(p::UPlot, r; logscale=false) = _rl_pos(Plots.xlims(p), r; logscale=logscale)
+@inline ry(p::UPlot, r; logscale=false) = _rl_pos(Plots.ylims(p), r; logscale=logscale)
+@info rx
+@info ry
 
 function x_axis_time!(
     p::UPlot;
@@ -117,67 +206,11 @@ function x_axis_time!(
     end
     return p
 end
-
-RGB256(r, g, b) = RGB(r/255, g/255, b/255)
-const cols = Dict(
-    "BA.2"      => RGB256(236, 126,  42),
-    "BA.5"      => RGB256(156, 196, 230),
-    "BF.7"      => RGB256(255, 192,   0),
-    "BN.1"      => RGB256(196,  90,  16),
-    "BQ.1.1"    => RGB256( 46, 116, 182),
-    "BA.2.75"   => RGB256(255, 104, 214),
-    "BQ.1"      => RGB256(168, 208, 142),
-    "XBB"       => RGB256(132, 152, 176),
-    "XBB.1.5"   => RGB256(112,  44, 160),
-    "XBB.1.9.1" => RGB256( 84, 132,  52),
-    "XBB+1.9.1" => RGB256( 98,  88, 106),
-)
-
-const figdir = "CurrentFigs/"
-
-const variant_names_to_be_plotted = [
-#    "BA.2",
-#    "BA.2.75",
-    "BA.5",
-    "BF.7",
-    "BN.1",
-#    "BQ.1",
-    "BQ.1.1",
-    "XBB",
-    "XBB.1.5",
-    "XBB.1.9.1",
-    "XBB+1.9.1",
-]
-
-@inline λ_logistic(t, α, β) = α + β * t
-
-function λ_star(λs, λe)
-    if λs == λe return λs end 
-    if λs + λe ≤ 0.0
-        if λs > -300.0 || λe > -300.0
-            return logit((softplus(λe) - softplus(λs)) / (λe - λs))
-        else
-            return logsubexp(λe, λs) - log(abs(λe - λs)) # 近似式
-            #return log1mexp(-abs(λe - λs)) - log(abs(λe - λs)) + max(λs, λe)
-        end
-    end
-    return -λ_star(-λs, -λe)
-end
-
-function t_star(ts, te, α, β)
-    @assert ts < te
-    if 1e-12 < abs(β)
-        λ = λ_star(λ_logistic(ts, α, β), λ_logistic(te, α, β))
-        t = (λ - α) / β
-    else
-        t = (ts + te) / 2.0
-    end
-    @assert ts ≤ t ≤ te
-    return t
-end
+@info x_axis_time!
 
 #-------
 # 基準株に対する他の株の検出数推移
+
 function p_variant_logit_transitions_against_base_variant(
     region, variants_df, logitreg_df;
     base_variant_name = "BA.5",
@@ -316,10 +349,12 @@ function p_variant_logit_transitions_against_base_variant(
     ylabel!(p2, "$(base_variant_name) 株の検出数に対する他の株の検出数の比（オッズ、対数目盛り）")
     return p
 end
+@info p_variant_logit_transitions_against_base_variant
 
-#--------
+@info "---------"
+@info "メイン関数定義"
 
-function main(region)
+function generate(region)
     variants_df, logitreg_df = load_jld2(input_jld2_filepaths[region])
     pyplot(
         titlefont=font("Meiryo",9),
@@ -360,9 +395,15 @@ function main(region)
     )
     return P
 end
+@info generate
 
-@info "$(@__MODULE__).main(:tokyo) または $(@__MODULE__).main(:osaka) として実行する"
-@info "返り値が Plots.Plot を値として持つ Dict 型変数"
+@info "========"
+@info ""
+@info "Variants_Plots.generate(:tokyo) または Variants_Plots.generate(:osaka) として実行する"
+@info "返り値は Plots.Plot を値として持つ Dict 型変数"
+@info "一部のプロットは画像用ディレクトリに出力される"
+@info ""
+@info "========"
 
 end #module
 

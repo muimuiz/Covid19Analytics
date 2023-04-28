@@ -1,5 +1,3 @@
-include("CommonDefs.jl")
-
 module Variants
 
 using Logging
@@ -48,6 +46,7 @@ const variant_names = [
     "XBB+1.9.1",
 ]
 @info "variant_names", variant_names
+
 @info "比較基準となる変異株名"
 const base_variant_names = [
     "BA.5",
@@ -59,7 +58,9 @@ const base_variant_names = [
 @info "base_variant_names", base_variant_names
 @assert base_variant_names ⊆ variant_names
 
+@info "--------"
 @info "予測させる時刻範囲"
+
 const predict_date_range = Date("2022-11-01"):Day(1):Date("2023-07-01")
 @info "predict_date_range", predict_date_range
 const predict_ts = date_to_value.(predict_date_range)
@@ -93,8 +94,11 @@ const jld2_filepaths = Dict(
 )
 @info "jld2_filepaths", jld2_filepaths
 
-@info "--------"
+@info "========"
 @info "関数定義"
+
+@info "--------"
+@info "データ読み込み用関数"
 
 function load_csv(region)
     @info "--------"
@@ -124,6 +128,10 @@ function load_csv(region)
     @info size(df)
     return df
 end
+@info load_csv
+
+@info "--------"
+@info "データ処理関数"
 
 function stat!(variants_df)
     @info "--------"
@@ -154,11 +162,15 @@ function stat!(variants_df)
     end
     return variants_df
 end
+@info stat!
 
-#-------
+@info "--------"
+@info "時刻区間代表値計算用関数"
 
 @inline λ_logistic(t, α, β) = α + β * t
 @inline p_logistic(t, α, β) = sigmoid(λ_logistic(t, α, β))
+@info λ_logistic
+@info p_logistic
 
 # 区間の両端のロジット値 (λs, λe) から、区間を代表するロジット値を求める
 function λ_star(λs, λe)
@@ -173,6 +185,7 @@ function λ_star(λs, λe)
     end
     return -λ_star(-λs, -λe)
 end
+@info λ_star
 
 # 時間区間 (ts, te) に対する成功確率から引き戻した時刻
 function t_star(ts, te, α, β)
@@ -186,6 +199,10 @@ function t_star(ts, te, α, β)
     @assert ts ≤ t ≤ te
     return t
 end
+@info t_star
+
+@info "--------"
+@info "自前の最適化問題計算用関数"
 
 # 2項分布の対数負値（自己情報量）
 function h_binom(n, k, t, α, β)
@@ -193,9 +210,11 @@ function h_binom(n, k, t, α, β)
     λ = λ_logistic(t, α, β)
     return - logabsbinomial(n, k)[1] - k * λ + n * log1pexp(λ)
 end
+@info h_binom
 
 # 対数尤度
 ℓ_binom(ns, ks, ts, α, β) = reduce(+, h_binom.(ns, ks, ts, α, β))
+@info ℓ_binom
 
 # 対数尤度の勾配
 function ∇ℓ_binom(ns, ks, ts, α, β)
@@ -203,6 +222,7 @@ function ∇ℓ_binom(ns, ks, ts, α, β)
     hs = ns .* p_logistic.(ts, α, β) .- ks
     return [reduce(+, hs), reduce(+, hs .* ts)]
 end
+@info ∇ℓ_binom
 
 # 対数尤度のヘッセ行列
 function Hesse_ℓ(ns, ks, ts, α, β)
@@ -213,9 +233,10 @@ function Hesse_ℓ(ns, ks, ts, α, β)
     h2 = reduce(+, ns .* ps .* qs .* ts.^2)
     return [h0 h1; h1 h2]
 end
+@info Hesse_ℓ
 
-# ニュートン法による回帰パラメーター推定
-function newton(df, α, β)
+# ニュートン＝ラフソン法による回帰パラメーター推定
+function newton_raphson(df, α, β)
     # 時間のスケール
     N  = nrow(df)
     mt = mean(df.t)
@@ -251,6 +272,10 @@ function newton(df, α, β)
     α = α′ - β * mt
     return α, β
 end
+@info newton_raphson
+
+@info "--------"
+@info "ロジスティック回帰用関数"
 
 # 2株間の回帰パラメーター探索
 function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
@@ -299,7 +324,7 @@ function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
             α, β = @rget(coefs)
             β_ci = @rget(cis)[2,:]
         elseif method == :nrm
-            α, β = newton(df, α, β)
+            α, β = newton_raphson(df, α, β)
         end
         if abs(α - α_prev) < 1e-10 && abs(β - β_prev) < 1e-12 break end
         df.t = t_star.(df.ts, df.te, α, β)
@@ -310,6 +335,7 @@ function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
     @info "α, β, slope, β_ci", α, β, slope, β_ci
     return α, β, slope, β_ci
 end
+@info logitreg_pair
 
 function logitreg(variants_df)
     @info "--------"
@@ -345,8 +371,28 @@ function logitreg(variants_df)
             ])
         end
     end
+    @info "--------"
+    @info "結果のチェック（warn が出力されないとき各方法での結果は一致）"
+    slope_tol = 1e-6
+    α_tol = 1e-8
+    β_tol = 1e-8
+    for row ∈ eachrow(df)
+        if abs(row.slope_j) > slope_tol @warn "glm_julia は収束していない: $(row.slope_j)" end
+        if abs(row.slope_r) > slope_tol @warn "glm_r は収束していない: $(row.slope_r)" end
+        if abs(row.slope_s) > slope_tol @warn "nrm は収束していない: $(row.slope_s)" end
+        if abs(row.α_j - row.α_r) > α_tol || abs(row.β_j - row.β_r) > β_tol
+            @warn "glm_julia と glm_r の結果は一致しない ($(row.α_j), $(row.β_j)), ($(row.α_r), $(row.β_r))"
+        end  
+        if abs(row.α_j - row.α_s) > α_tol || abs(row.β_j - row.β_s) > β_tol
+            @warn "glm_julia と nrm の結果は一致しない ($(row.α_j), $(row.β_j)), ($(row.α_s), $(row.β_s))"
+        end
+    end
     return df
 end
+@info logitreg
+
+@info "--------"
+@info "計算結果保存用関数"
 
 function save_jld2(region, variants_df, logitreg_df)
     filepath = jld2_filepaths[region]
@@ -357,8 +403,10 @@ function save_jld2(region, variants_df, logitreg_df)
         jld2_file["logitreg_df"]        = logitreg_df
     end
 end
+@info save_jld2
 
-#-------
+@info "--------"
+@info "メインルーチン"
 
 function main(region)
     @assert region ∈ capable_regions
@@ -381,16 +429,19 @@ function main(region)
     @info "========"
     @info "パラメーター探索"
     logitreg_df = logitreg(variants_df)
-    @info "--------"
-    @info "ロジスティック回帰 データフレーム"
-    @info logitreg_df
+    @info "size(logitreg_df)", size(logitreg_df)
     @info "========"
     @info "解析データ書き出し"
     @info "  データをJLD2形式のファイルとして出力する"
     save_jld2(region, variants_df, logitreg_df)
 end
+@info main
 
-@info "$(@__MODULE__).main(:tokyo) または $(@__MODULE__).main(:osaka) として実行する"
+@info "========"
+@info ""
+@info "Variants.main(:tokyo) または Variants.main(:osaka) として実行する"
+@info ""
+@info "========"
 
 end #module
 
