@@ -170,7 +170,7 @@ p^\star(t_S, t_E; \alpha, \beta)
   & = \frac{1}{t_E - t_S} \int_{t_S}^{t_E} p(t; \alpha, \beta)\ dt\\
   & = \frac{1}{t_E - t_S} \int_{t_S}^{t_E} \mathrm{sigmoid}\ \lambda(t; \alpha, \beta)\ dt\\
   & = \begin{dcases}
-    \frac{\marthrm{softplus}\ \lambda_E - \mathrm{softplus}\ \lambda_S}{\lambda_E - \lambda_S}, & \quad (\beta \neq 0)\\
+    \frac{\mathrm{softplus}\ \lambda_E - \mathrm{softplus}\ \lambda_S}{\lambda_E - \lambda_S}, & \quad (\beta \neq 0)\\
     \mathrm{sigmoid}\ \alpha. & \quad (\beta = 0)
   \end{dcases}
 \end{split}\tag{A1}\end{equation}
