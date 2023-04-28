@@ -366,7 +366,7 @@ $$
 __［定理］__
 対数尤度 $\ell$ は凸関数である。
 
-（略証）$\ell$ は凸関数 $h_i$ の和であり、凸関数の和は凸関数であることから導かれる。■
+（略証） $\ell$ は凸関数 $h_i$ の和であり、凸関数の和は凸関数であることから導かれる。■
 
 __［命題］__
 対数尤度のパラメーター $\alpha,\ \beta$ による微分、2階微分は以下のように表せる。
@@ -438,8 +438,8 @@ Julia では、右辺第一項のような計算を行うために $\mathtt{LogE
 
 $$
 \begin{equation*}\begin{split}
-\begin{pmatrix}\alpha_{j+1}\\\beta_{j+1}\end{pmatrix}
-  & = \begin{pmatrix}\alpha_j\\\beta_j\end{pmatrix} - r_j \begin{pmatrix}\partial_\alpha \ell_j\\\partial_\beta \ell_j\end{pmatrix}.
+\begin{pmatrix}\alpha_{j+1}\\\ \beta_{j+1}\end{pmatrix}
+  & = \begin{pmatrix}\alpha_j\\\ \beta_j\end{pmatrix} - r_j \begin{pmatrix}\partial_\alpha \ell_j\\\ \partial_\beta \ell_j\end{pmatrix}.
 \end{split}\end{equation*}
 $$
 
@@ -482,8 +482,8 @@ $\mathtt{glm}$ のロジスティック回帰ではリンク関数としてロ�
 
 $$
 \begin{equation*}\begin{split}
-\begin{pmatrix}\alpha_{j+1}\\\beta_{j+1}\end{pmatrix}
-  & = \begin{pmatrix}\alpha_j\\\beta_j\end{pmatrix} - \begin{pmatrix}\partial_{\alpha\alpha} \ell_j & \partial_{\alpha\beta} \ell_j\\\partial_{\alpha\beta} \ell_j & \partial_{\beta\beta} \ell_j\end{pmatrix}^{-1} \begin{pmatrix}\partial_\alpha \ell_j\\\partial_\beta \ell_j\end{pmatrix}.
+\begin{pmatrix}\alpha_{j+1}\\\ \beta_{j+1}\end{pmatrix}
+  & = \begin{pmatrix}\alpha_j\\\ \beta_j\end{pmatrix} - \begin{pmatrix}\partial_{\alpha\alpha} \ell_j & \partial_{\alpha\beta} \ell_j\\\ \partial_{\alpha\beta} \ell_j & \partial_{\beta\beta} \ell_j\end{pmatrix}^{-1} \begin{pmatrix}\partial_\alpha \ell_j\\\ \partial_\beta \ell_j\end{pmatrix}.
 \end{split}\end{equation*}
 $$
 
