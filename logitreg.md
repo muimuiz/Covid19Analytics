@@ -8,78 +8,78 @@
 ## 標準シグモイド関数とロジット関数
 
 はじめに、この覚書きで頻出する3つの関数について特に関数名を定め、その性質を列挙しておく。
-まず、標準シグモイド関数（ロジスティック関数）と、その逆関数であるロジットとを表す記号としてそれぞれ $\operatorname{sigmoid},\ \operatorname{logit}$ を用いる。
+まず、標準シグモイド関数（ロジスティック関数）と、その逆関数であるロジットとを表す記号としてそれぞれ $\mathrm{sigmoid},\ \mathrm{logit}$ を用いる。
 
 __［定義］__
 実数値関数である標準シグモイド関数（ロジスティック関数）と、 $(0, 1)$ を定義域とするロジットとを以下のように定める。
 
 $$
 \begin{equation*}\begin{split}
-\operatorname{sigmoid} \lambda
+\mathrm{sigmoid}\ \lambda
   & = \frac{e^\lambda}{e^\lambda + 1}
     = \frac{1}{1 + e^{-\lambda}},\\
-\operatorname{logit} p
+\mathrm{logit}\ p
   & = \log\frac{p}{1 - p}
     = \log p - \log(1 - p). \qquad (0 < p < 1)\\
 \end{split}\end{equation*}
 $$
 
 __［命題］__
-$\operatorname{sigmoid}$ と $\operatorname{logit}$ は互いの逆関数である。
+$\mathrm{sigmoid}$ と $\mathrm{logit}$ は互いの逆関数である。
 
 $$
 \begin{equation*}\begin{split}
-\operatorname{sigmoid}(\operatorname{logit} p) & = p, \qquad (0 < p < 1)\\
-\operatorname{logit}(\operatorname{sigmoid} \lambda) & = \lambda.\\
+\mathrm{sigmoid}(\mathrm{logit}\ p) & = p, \qquad (0 < p < 1)\\
+\mathrm{logit}(\mathrm{sigmoid}\ \lambda) & = \lambda.\\
 \end{split}\end{equation*}
 $$
 
-また、しばしばソフトプラスと呼ばれる次の関数を $\operatorname{softplus}$ と表すものとする。
+また、しばしばソフトプラスと呼ばれる次の関数を $\mathrm{softplus}$ と表すものとする。
 
 __［定義］__
-実関数 $\operatorname{softplus}$ を以下のように定める。
+実関数 $\mathrm{softplus}$ を以下のように定める。
 
 $$
-\operatorname{softplus} λ = \log(e^λ + 1).
+\mathrm{softplus}\ \lambda = \log(e^\lambda + 1).
 $$
 
 __［命題］__
-$\operatorname{sigmoid},\ \operatorname{logit},\ \operatorname{softplus}$ に関して、以下の関係が成り立つ。
+$\mathrm{sigmoid},\ \mathrm{logit},\ \mathrm{softplus}$ に関して、以下の関係が成り立つ。
 
 $$
 \begin{equation*}\begin{split}
-\operatorname{sigmoid}\lambda & \to 0 \qquad (\lambda \to -\infty),\\
-\operatorname{sigmoid}0 & = \frac{1}{2},\\
-\operatorname{sigmoid}\lambda & \to 1 \qquad (\lambda \to +\infty),\\
-\operatorname{sigmoid}(- \lambda) & = 1 - \operatorname{sigmoid} \lambda,\\
+\mathrm{sigmoid}\ \lambda & \to 0 \qquad (\lambda \to -\infty),\\
+\mathrm{sigmoid}\ 0 & = \frac{1}{2},\\
+\mathrm{sigmoid}\ \lambda & \to 1 \qquad (\lambda \to +\infty),\\
+\mathrm{sigmoid}(- \lambda) & = 1 - \mathrm{sigmoid}\ \lambda,\\
 e^\lambda
-  & = \frac{\operatorname{sigmoid} \lambda}{1 - \operatorname{sigmoid} \lambda},\\
-\int \operatorname{sigmoid} \lambda\ d\lambda
-  & = \operatorname{softplus} \lambda + \mathrm{const.}
+  & = \frac{\mathrm{sigmoid}\ \lambda}{1 - \mathrm{sigmoid}\ \lambda},\\
+\int \mathrm{sigmoid}\ \lambda\ d\lambda
+  & = \mathrm{softplus}\ \lambda + \mathrm{const.}
     = \log(e^\lambda + 1) + \mathrm{const.},\\
-\frac{d}{d\lambda}\operatorname{sigmoid} \lambda
+\frac{d}{d\lambda}\mathrm{sigmoid}\ \lambda
   & = \frac{e^\lambda}{(e^\lambda + 1)^2}
-    = \operatorname{sigmoid} \lambda \cdot (1 - \operatorname{sigmoid} \lambda),\\
-\operatorname{logit}p & \to -\infty \qquad (p \to 0^+),\\
-\operatorname{logit}\frac{1}{2} & = 0,\\
-\operatorname{logit}p & \to +\infty \qquad (p \to 1^-),\\
-\operatorname{logit}(1 - p) & = - \operatorname{logit} p,\\
+    = \mathrm{sigmoid}\ \lambda \cdot (1 - \mathrm{sigmoid}\ \lambda),\\
+\mathrm{logit}\ p & \to -\infty \qquad (p \to 0^+),\\
+\mathrm{logit}\frac{1}{2} & = 0,\\
+\mathrm{logit}\ p & \to +\infty \qquad (p \to 1^-),\\
+\mathrm{logit}(1 - p) & = - \mathrm{logit}\ p,\\
 \log x
-  & = \operatorname{logit}\frac{x}{x + 1}, \qquad (x > 0)\\
-\int \operatorname{logit} p\ dp
+  & = \mathrm{logit}\frac{x}{x + 1}, \qquad (x > 0)\\
+\int \mathrm{logit}\ p\ dp
   & = p \log p + (1 - p)\log(1 - p) + \mathrm{const.},\\
-\frac{d}{dp}\operatorname{logit} p
+\frac{d}{dp}\mathrm{logit}\ p
   & = \frac{1}{p\ (1 - p)},\\
-\operatorname{softplus}\lambda
+\mathrm{softplus}\ \lambda
   & = e^\lambda + O((e^\lambda)^2) \qquad (\lambda \ll 0),\\
-\operatorname{softplus}\lambda
+\mathrm{softplus}\ \lambda
   & = \lambda + e^{-\lambda} + O((e^{-\lambda})^2) \qquad (\lambda \gg 0),\\
-\operatorname{softplus}(- \lambda)
-  & = \operatorname{softplus} \lambda - \lambda.
+\mathrm{softplus}(- \lambda)
+  & = \mathrm{softplus}\ \lambda - \lambda.
 \end{split}\end{equation*}
 $$
 
-上のように、 $\operatorname{sigmoid}$ の積分が $\operatorname{softplus}$ であり、その逆関数 $\operatorname{logit}$ の積分は（符号を変えた）シャノン・エントロピーとなる。
+上のように、 $\mathrm{sigmoid}$ の積分が $\mathrm{softplus}$ であり、その逆関数 $\mathrm{logit}$ の積分は（符号を変えた）シャノン・エントロピーとなる。
 
 ## モデルとデータ
 
@@ -107,7 +107,7 @@ __［仮定］__
 $$
 \begin{equation*}\begin{split}
 D & = \left(\ (t_{S1}, t_{E1}, n_1, k_1),\ (t_{S2}, t_{E2}, n_2, k_2), \cdots, (t_{SN}, t_{EN}, n_N, k_N)\ \right)\\
-  & \operatorname{where}\quad t_{Si} < t_{Ei}, \quad k_i, n_i \in \mathbb{Z}_{\geq 0},\ 0 \leq k_i \leq n_i, \quad i = 1, 2, \cdots, N.
+  & \mathrm{where}\quad t_{Si} < t_{Ei}, \quad k_i, n_i \in \mathbb{Z}_{\geq 0},\ 0 \leq k_i \leq n_i, \quad i = 1, 2, \cdots, N.
 \end{split}\end{equation*}
 $$
 
@@ -125,7 +125,7 @@ $n$ 回のベルヌーイ試行に対し、各試行の成功確率自体が確�
 
 $$
 \begin{equation*}\begin{split}
-\operatorname{Pr}(P \leq p)
+\mathrm{Pr}(P \leq p)
   & = F(p), \qquad (0 \leq p \leq 1)
 \end{split}\end{equation*}
 $$
@@ -134,7 +134,7 @@ $$
 
 $$
 \begin{equation*}\begin{split}
-\langle p\rangle = \operatorname{E}[P] & = \int_{0}^{1} dF(p),
+\langle p\rangle = \mathrm{E}[P] & = \int_{0}^{1} dF(p),
 \end{split}\end{equation*}
 $$
 
@@ -142,8 +142,8 @@ $$
 
 $$
 \begin{equation*}\begin{split}
-\operatorname{Pr}(K = k)
-  & = \operatorname{Bin}(n, k; \langle p\rangle) = \binom{n}{k} \langle p\rangle^k (1 - \langle p\rangle)^{n - k}.
+\mathrm{Pr}(K = k)
+  & = \mathrm{Bin}(n, k; \langle p\rangle) = \binom{n}{k} \langle p\rangle^k (1 - \langle p\rangle)^{n - k}.
 \end{split}\end{equation*}
 $$
 
@@ -168,10 +168,10 @@ $$
 \begin{equation}\begin{split}
 p^\star(t_S, t_E; \alpha, \beta)
   & = \frac{1}{t_E - t_S} \int_{t_S}^{t_E} p(t; \alpha, \beta)\ dt\\
-  & = \frac{1}{t_E - t_S} \int_{t_S}^{t_E} \operatorname{sigmoid}\lambda(t; \alpha, \beta)\ dt\\
+  & = \frac{1}{t_E - t_S} \int_{t_S}^{t_E} \mathrm{sigmoid}\ \lambda(t; \alpha, \beta)\ dt\\
   & = \begin{dcases}
-    \frac{\operatorname{softplus}\lambda_E - \operatorname{softplus}\lambda_S}{\lambda_E - \lambda_S}, & \quad (\beta \neq 0)\\
-    \operatorname{sigmoid} \alpha. & \quad (\beta = 0)
+    \frac{\marthrm{softplus}\ \lambda_E - \mathrm{softplus}\ \lambda_S}{\lambda_E - \lambda_S}, & \quad (\beta \neq 0)\\
+    \mathrm{sigmoid}\ \alpha. & \quad (\beta = 0)
   \end{dcases}
 \end{split}\tag{A1}\end{equation}
 $$
@@ -183,8 +183,8 @@ $p^\star$ に対して、次の関係で結ばれるロジットを $\lambda^\st
 
 $$
 \begin{equation*}\begin{split}
-p^\star & = \operatorname{sigmoid}\lambda^\star,\\
-\lambda^\star & = \operatorname{logit}p^\star.\\
+p^\star & = \mathrm{sigmoid}\ \lambda^\star,\\
+\lambda^\star & = \mathrm{logit}\ p^\star.\\
 \end{split}\end{equation*}
 $$
 
@@ -196,7 +196,7 @@ $$
 t^\star
   & = \begin{dcases}
     \frac{\lambda^\star - \alpha}{\beta}
-    = \frac{\operatorname{logit}p^\star - \alpha}{\beta}, & \quad (\beta \neq 0)\\
+    = \frac{\mathrm{logit}\ p^\star - \alpha}{\beta}, & \quad (\beta \neq 0)\\
     \frac{t_S + t_E}{2}. & \quad (\beta = 0)
   \end{dcases}
 \end{split}\tag{A2}\end{equation*}
@@ -254,7 +254,7 @@ $$
 
 ## 二項分布の確率の対数
 
-先に見たように、ビン内で試行数 $n$ に対し成功数 $k$ となる確率関数は、成功確率を $p^\star$ とする二項分布 $f(n, k; p^\star) = \operatorname{Bin}(n, k; p^\star)$ となる。
+先に見たように、ビン内で試行数 $n$ に対し成功数 $k$ となる確率関数は、成功確率を $p^\star$ とする二項分布 $f(n, k; p^\star) = \mathrm{Bin}(n, k; p^\star)$ となる。
 
 __［定義］__
 $f(n, k; p^\star)$ の対数の負値（自己情報量）を $\alpha,\ \beta$ の関数とみて $h$ で表す。
@@ -411,14 +411,14 @@ __［命題］__
 
 $$
 \begin{equation*}\begin{split}
-\operatorname{logit}\frac{\operatorname{softplus}\lambda_E - \operatorname{softplus}\lambda_S}{\lambda_E - \lambda_S}
-  & = -\operatorname{logit}\frac{\operatorname{softplus}(-\lambda_E) - \operatorname{softplus}(-\lambda_S)}{- \lambda_E + \lambda_S} \qquad (\lambda_S \neq \lambda_E)
+\mathrm{logit}\frac{\mathrm{softplus}\ \lambda_E - \mathrm{softplus}\ \lambda_S}{\lambda_E - \lambda_S}
+  & = -\mathrm{logit}\frac{\mathrm{softplus}(-\lambda_E) - \mathrm{softplus}(-\lambda_S)}{- \lambda_E + \lambda_S} \qquad (\lambda_S \neq \lambda_E)
 \end{split}\end{equation*}
 $$
 
-よって、 $\lambda^\star$ を求めるために (A!) 式中の $\operatorname{softplus}$ 関数の引数は双方が正とならないようにできる。
+よって、 $\lambda^\star$ を求めるために (A!) 式中の $\mathrm{softplus}$ 関数の引数は双方が正とならないようにできる。
 
-また、 $\operatorname{softplus}$ 関数を広い範囲で求めることができるライブラリを活用でき、例えば Julia 言語では、 $\mathtt{LogExpFunctions}$ モジュールの $\mathtt{log1pexp()}$ 関数がこれにあたる。
+また、 $\mathrm{softplus}$ 関数を広い範囲で求めることができるライブラリを活用でき、例えば Julia 言語では、 $\mathtt{LogExpFunctions}$ モジュールの $\mathtt{log1pexp()}$ 関数がこれにあたる。
 
 __［命題］__
 次の近似が成り立つ。
