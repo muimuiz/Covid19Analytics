@@ -1,0 +1,4 @@
+*.jld2
+*.png
+CurrentFigs/*.png
+OldData/
