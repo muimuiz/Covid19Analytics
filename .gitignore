@@ -1,4 +1,6 @@
 *.jld2
 *.png
+*.gif
+*.pdf
 CurrentFigs/*.png
 OldData/
