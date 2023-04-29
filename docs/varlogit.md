@@ -48,8 +48,9 @@ $x_0$ を基準とする $x_1$ の比（オッズ）の自然対数（ロジッ�
 $$
 \begin{equation*}\begin{split}
 \lambda & = \log \frac{x_1}{x_0} = \alpha + \beta t,
-\tag{A}
-\end{split}\end{equation*}
+\end{split}
+  \tag{A}
+\end{equation*}
 $$
 
 となる。
@@ -82,8 +83,9 @@ $$
   & = \frac{b_0 e^{a_0 + b_0 t} + b_1 e^{a_1 + b_1 t}}{e^{a_0 + b_0 t} + e^{a_1 + b_1 t}}\\
   & = \frac{b_0 + (b_0 + \beta) e^{\alpha + \beta t}}{1 + e^{\alpha + \beta t}}\\
   & = b_0 + \beta\ \mathrm{sigmoid}(\alpha + \beta t),
-\tag{B}
-\end{split}\end{equation*}
+\end{split}
+  \tag{B}
+\end{equation*}
 $$
 
 となる。
@@ -128,7 +130,7 @@ $$
 $$
 \begin{equation*}\begin{split}
 \zeta(t) = \frac{d}{dt} \log x(t) = \frac{x^\prime}{x}
-  & = \frac{\sum_{i = 0}^{n - 1} b_i e^{a_i + b_i t}}{\sum_{i = 0}^{n - 1} e^{a_i + b_i t}},
+  & = \frac{\displaystyle\sum_{i = 0}^{n - 1} b_i e^{a_i + b_i t}}{\displaystyle\sum_{i = 0}^{n - 1} e^{a_i + b_i t}},
 \end{split}\end{equation*}
 $$
 
@@ -148,9 +150,10 @@ $$
 $$
 \begin{equation*}\begin{split}
 \zeta(t)
-  & = b_0 + \frac{\sum_{i = 1}^{n - 1} \beta_i e^{\alpha_i + \beta_i t}}{1 + \sum_{i = 1}^{n - 1} e^{\alpha_i + \beta_i t}},
-\tag{C}
-\end{split}\end{equation*}
+  & = b_0 + \frac{\displaystyle\sum_{i = 1}^{n - 1} \beta_i e^{\alpha_i + \beta_i t}}{\displaystyle 1 + \sum_{i = 1}^{n - 1} e^{\alpha_i + \beta_i t}},
+\end{split}
+  \tag{C}
+\end{equation*}
 $$
 
 を得る。
