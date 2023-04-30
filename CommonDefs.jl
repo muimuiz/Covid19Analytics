@@ -1,4 +1,5 @@
 module CommonDefs
+
 using Dates
 using DataFrames
 using Statistics
@@ -307,5 +308,14 @@ end
     return haskey(d, name) && isa(d[name], type) && (isnothing(pred) || pred(d[name]))
 end
 export has_name, requires
+
+#--------
+# ev
+
+macro @evexpr(expr)
+    print("$(string(expr)) = ")
+    esc(:(println($expr)))
+end
+export @evexpr
 
 end #module
