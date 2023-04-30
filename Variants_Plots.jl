@@ -1,3 +1,4 @@
+include("CommonDefs.jl")
 module Variants_Plots
 
 using Logging
@@ -14,11 +15,11 @@ using ..CommonDefs
 
 @info "========"
 @info "モジュール"
-@info @__MODULE__
+@insp @__MODULE__
 
 @info "--------"
 @info "作業ディレクトリ"
-@info pwd()
+@insp pwd()
 
 @info "========"
 @info "定数"
@@ -30,7 +31,7 @@ const input_jld2_filepaths = Dict(
     :tokyo => "variants_latest_tokyo.jld2",
     :osaka => "variants_latest_osaka.jld2",
 )
-@info "input_jld2_filepaths", input_jld2_filepaths
+@insp input_jld2_filepaths
 
 @info "--------"
 @info "プロットする変異株"
@@ -48,26 +49,31 @@ const variant_names_to_be_plotted = [
     "XBB.1.9.1",
     "XBB+1.9.1",
 ]
-@info "variant_names_to_be_plotted", variant_names_to_be_plotted
+@insp variant_names_to_be_plotted
 
 @info "--------"
 @info "プロット時間範囲"
 
 const plot_earliest_start_date = Date("2022-10-31")
 const plot_latest_end_date     = Date("2023-06-02")
-@info "plot_earliest_start_date", plot_earliest_start_date
-@info "plot_latest_end_date", plot_latest_end_date
+@insp plot_earliest_start_date, plot_latest_end_date
+
+@info "--------"
+@info "プロットとサブプロットの合併型定義"
+
+UPlot = Union{Plots.Plot,Plots.Subplot}
+@insp UPlot
 
 @info "--------"
 @info "画像出力ディレクトリ"
 
 const figdir = "CurrentFigs/"
-@info "figdir", figdir
+@insp figdir
 
 @info "--------"
 @info "描画色"
 
-RGB256(r, g, b) = RGB(r/255, g/255, b/255)
+@inline RGB256(r, g, b) = RGB(r/255, g/255, b/255)
 const cols = Dict(
     "BA.2"      => RGB256(236, 126,  42),
     "BA.5"      => RGB256(156, 196, 230),
@@ -81,7 +87,7 @@ const cols = Dict(
     "XBB.1.9.1" => RGB256( 84, 132,  52),
     "XBB+1.9.1" => RGB256( 98,  88, 106),
 )
-@info "length(cols)", length(cols)
+@insp length(cols)
 
 @info "========"
 @info "関数定義"
@@ -99,7 +105,7 @@ function load_jld2(filepath)
     logitreg_df = D[:logitreg_df]
     return variants_df, logitreg_df
 end
-@info load_jld2
+@insp load_jld2
 
 #=
 for key in keys(D)
@@ -113,7 +119,7 @@ end
 @info "時刻区間代表値計算用関数"
 
 @inline λ_logistic(t, α, β) = α + β * t
-@info λ_logistic
+@insp λ_logistic
 
 function λ_star(λs, λe)
     if λs == λe return λs end 
@@ -127,7 +133,7 @@ function λ_star(λs, λe)
     end
     return -λ_star(-λs, -λe)
 end
-@info λ_star
+@insp λ_star
 
 function t_star(ts, te, α, β)
     @assert ts < te
@@ -140,12 +146,10 @@ function t_star(ts, te, α, β)
     @assert ts ≤ t ≤ te
     return t
 end
-@info t_star
+@insp t_star
 
 @info "--------"
 @info "プロット用関数"
-
-UPlot = Union{Plots.Plot,Plots.Subplot}
 
 function _rl_pos(l::Tuple, r; logscale=false)
     if logscale
@@ -159,8 +163,8 @@ end
 @info _rl_pos
 @inline rx(p::UPlot, r; logscale=false) = _rl_pos(Plots.xlims(p), r; logscale=logscale)
 @inline ry(p::UPlot, r; logscale=false) = _rl_pos(Plots.ylims(p), r; logscale=logscale)
-@info rx
-@info ry
+@insp rx
+@insp ry
 
 function x_axis_time!(
     p::UPlot;
@@ -206,10 +210,10 @@ function x_axis_time!(
     end
     return p
 end
-@info x_axis_time!
+@insp x_axis_time!
 
-#-------
-# 基準株に対する他の株の検出数推移
+@info "--------"
+@info "基準株に対する他の株のロジットの時間推移プロット関数"
 
 function p_variant_logit_transitions_against_base_variant(
     region, variants_df, logitreg_df;
@@ -355,23 +359,37 @@ end
 @info "メイン関数定義"
 
 function generate(region)
+    @info "========"
+    @info "プロット生成"
+    @info "--------"
+    @info "データ読み込み"
     variants_df, logitreg_df = load_jld2(input_jld2_filepaths[region])
+    @insp size(variants_df), size(logitreg_df)
+    @info "--------"
+    @info "追加アノテーションのパラメーター定義"
+    value_annotations_XBB_against_BA_5 = [
+        ("XBB.1.5",   date_to_value(Date("2023-02-01")), -5.5),
+        ("XBB+1.9.1", date_to_value(Date("2023-03-01")), -3.5)
+    ]
+    @info "--------"
+    @info "Plots 初期化"
     pyplot(
         titlefont=font("Meiryo",9),
         guidefont=font("Meiryo",8),
         tickfont=font("monospace",8)
     )
     P = Dict{Symbol, Plots.Plot}()
-    value_annotations_XBB_against_BA_5 = [
-        ("XBB.1.5",   date_to_value(Date("2023-02-01")), -5.5),
-        ("XBB+1.9.1", date_to_value(Date("2023-03-01")), -3.5)
-    ]
+    @info "--------"
+    @info "プロット生成"
     #-------
     @info "against_BA_5"
     P[:against_BA_5] = p_variant_logit_transitions_against_base_variant(region, variants_df, logitreg_df;
         value_annotations = value_annotations_XBB_against_BA_5,
     )
-    savefig(P[:against_BA_5], figdir * "tokyo_logit_transitions")
+    @info "プロット書き出し"
+    filepath = figdir * "tokyo_logit_transitions"
+    @insp filepath
+    savefig(P[:against_BA_5], filepath)
     #-------
     @info "XBB_against_BA_5"
     P[:XBB_against_BA_5] = p_variant_logit_transitions_against_base_variant(region, variants_df, logitreg_df;
@@ -395,13 +413,13 @@ function generate(region)
     )
     return P
 end
-@info generate
+@insp generate
 
 @info "========"
 @info ""
 @info "Variants_Plots.generate(:tokyo) または Variants_Plots.generate(:osaka) として実行する"
 @info "返り値は Plots.Plot を値として持つ Dict 型変数"
-@info "一部のプロットは画像用ディレクトリに出力される"
+@info "一部のプロットは画像用ディレクトリに直ちに出力される"
 @info ""
 @info "========"
 

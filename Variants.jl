@@ -1,3 +1,4 @@
+include("CommonDefs.jl")
 module Variants
 
 using Logging
@@ -18,17 +19,17 @@ using ..CommonDefs
 
 @info "========"
 @info "モジュール"
-@info @__MODULE__
+@insp @__MODULE__
 
 @info "--------"
 @info "作業ディレクトリ"
-@info pwd()
+@insp pwd()
 
 @info "--------"
 @info "指定可能な対象地域"
 
 const capable_regions = [:tokyo, :osaka]
-@info "capable_regions", capable_regions
+@insp capable_regions
 
 @info "--------"
 @info "対象となる変異株名"
@@ -45,7 +46,7 @@ const variant_names = [
     "XBB.1.9.1",
     "XBB+1.9.1",
 ]
-@info "variant_names", variant_names
+@insp variant_names
 
 @info "比較基準となる変異株名"
 const base_variant_names = [
@@ -55,15 +56,16 @@ const base_variant_names = [
     "BQ.1.1",
     "XBB.1.5",
 ]
-@info "base_variant_names", base_variant_names
+@insp base_variant_names
 @assert base_variant_names ⊆ variant_names
 
 @info "--------"
 @info "予測させる時刻範囲"
 
 const predict_date_range = Date("2022-11-01"):Day(1):Date("2023-07-01")
-@info "predict_date_range", predict_date_range
+@insp predict_date_range
 const predict_ts = date_to_value.(predict_date_range)
+@insp length(predict_ts)
 
 @info "--------"
 @info "データファイル"
@@ -72,7 +74,7 @@ const csv_filepaths = Dict(
     :tokyo => "./東京変異株.csv",
     :osaka => "./大阪変異株.csv",
 )
-@info csv_filepaths
+@insp csv_filepaths
 @info "  \"$(csv_filepaths[:tokyo])\" はおそらく感染研に依頼したゲノム解析の結果のデータ"
 @info "  都PDF資料からGoogleスプレッドシートに手入力しCSV出力したもの"
 @info "  cf. https://www.fukushihoken.metro.tokyo.lg.jp/iryo/kansen/corona_portal/henikabu/screening.html"
@@ -92,7 +94,7 @@ const jld2_filepaths = Dict(
     :tokyo => "./variants_latest_tokyo.jld2",
     :osaka => "./variants_latest_osaka.jld2",
 )
-@info "jld2_filepaths", jld2_filepaths
+@insp jld2_filepaths
 
 @info "========"
 @info "関数定義"
@@ -107,9 +109,9 @@ function load_csv(region)
     @info "--------"
     @info "CSV 読込み"
     filepath = csv_filepaths[region]
-    @info "filepath", filepath
+    @insp filepath
     csv_df = CSV.read(filepath, DataFrame; missingstring="")
-    @info "size(csv_df)", size(csv_df)
+    @insp size(csv_df)
     @info "--------"
     @info "出力用データフレーム作成"
     df = DataFrame()
@@ -122,10 +124,10 @@ function load_csv(region)
     @info "変異株数のコピー"
     for var ∈ variant_names
         if !has_name(csv_df, var) continue end
-        @info var
+        @insp var
         df[:,var] = csv_df[:,var]
     end
-    @info size(df)
+    @insp size(df)
     return df
 end
 @info load_csv
@@ -137,12 +139,12 @@ function stat!(variants_df)
     @info "--------"
     @info "変異株間のオッズその他の統計量を算出する"
     n_rows = nrow(variants_df)
-    @info "n_rows", n_rows
+    @insp n_rows
     @info "--------"
     @info "変異株間のオッズ (VAR1_VAR2_odds)、信頼区間 (VAR1_VAR2_odds_(cil|ciu))"
     for (var1, var2) in combinations(variant_names, 2)
         if !has_name(variants_df, var1) || !has_name(variants_df, var2) continue end
-        @info "var1, var2", var1, var2
+        @insp var1, var2
         k1s = variants_df[!,var1]
         k2s = variants_df[!,var2]
         odds = k1s ./ k2s
@@ -162,15 +164,15 @@ function stat!(variants_df)
     end
     return variants_df
 end
-@info stat!
+@insp stat!
 
 @info "--------"
 @info "時刻区間代表値計算用関数"
 
 @inline λ_logistic(t, α, β) = α + β * t
 @inline p_logistic(t, α, β) = sigmoid(λ_logistic(t, α, β))
-@info λ_logistic
-@info p_logistic
+@insp λ_logistic
+@insp p_logistic
 
 # 区間の両端のロジット値 (λs, λe) から、区間を代表するロジット値を求める
 function λ_star(λs, λe)
@@ -185,7 +187,7 @@ function λ_star(λs, λe)
     end
     return -λ_star(-λs, -λe)
 end
-@info λ_star
+@insp λ_star
 
 # 時間区間 (ts, te) に対する成功確率から引き戻した時刻
 function t_star(ts, te, α, β)
@@ -199,7 +201,7 @@ function t_star(ts, te, α, β)
     @assert ts ≤ t ≤ te
     return t
 end
-@info t_star
+@insp t_star
 
 @info "--------"
 @info "自前の最適化問題計算用関数"
@@ -210,11 +212,11 @@ function h_binom(n, k, t, α, β)
     λ = λ_logistic(t, α, β)
     return - logabsbinomial(n, k)[1] - k * λ + n * log1pexp(λ)
 end
-@info h_binom
+@insp h_binom
 
 # 対数尤度
 ℓ_binom(ns, ks, ts, α, β) = reduce(+, h_binom.(ns, ks, ts, α, β))
-@info ℓ_binom
+@insp ℓ_binom
 
 # 対数尤度の勾配
 function ∇ℓ_binom(ns, ks, ts, α, β)
@@ -222,7 +224,7 @@ function ∇ℓ_binom(ns, ks, ts, α, β)
     hs = ns .* p_logistic.(ts, α, β) .- ks
     return [reduce(+, hs), reduce(+, hs .* ts)]
 end
-@info ∇ℓ_binom
+@insp ∇ℓ_binom
 
 # 対数尤度のヘッセ行列
 function Hesse_ℓ(ns, ks, ts, α, β)
@@ -233,10 +235,10 @@ function Hesse_ℓ(ns, ks, ts, α, β)
     h2 = reduce(+, ns .* ps .* qs .* ts.^2)
     return [h0 h1; h1 h2]
 end
-@info Hesse_ℓ
+@insp Hesse_ℓ
 
 # ニュートン＝ラフソン法による回帰パラメーター推定
-function newton_raphson(df, α, β)
+function newton_raphson_method(df, α, β)
     # 時間のスケール
     N  = nrow(df)
     mt = mean(df.t)
@@ -272,7 +274,7 @@ function newton_raphson(df, α, β)
     α = α′ - β * mt
     return α, β
 end
-@info newton_raphson
+@insp newton_raphson_method
 
 @info "--------"
 @info "ロジスティック回帰用関数"
@@ -292,7 +294,7 @@ function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
     dropmissing!(df, :n)
     filter!(row -> row.n != 0, df)
     N = nrow(df)
-    @info "データ件数", N
+    @insp N
     @assert N ≥ 2
     df.t_mid = (df.ts .+ df.te) ./ 2.0
     df.prop  = df.k1 ./ df.n
@@ -302,7 +304,7 @@ function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
     @info "初期パラメーター"
     ir = is_regular.(df.logit)
     α, β = linear_regression(df.t_mid[ir], df.logit[ir])
-    @info "α, β", α, β
+    @insp α, β
     @assert is_regular(α) && is_regular(β)
     df.t = df.t_mid
     @info "--------"
@@ -324,7 +326,7 @@ function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
             α, β = @rget(coefs)
             β_ci = @rget(cis)[2,:]
         elseif method == :nrm
-            α, β = newton_raphson(df, α, β)
+            α, β = newton_raphson_method(df, α, β)
         end
         if abs(α - α_prev) < 1e-10 && abs(β - β_prev) < 1e-12 break end
         df.t = t_star.(df.ts, df.te, α, β)
@@ -332,7 +334,7 @@ function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
     @info "-------"
     @info "近似結果"
     slope = norm(∇ℓ_binom(df.n, df.k1, df.t, α, β))
-    @info "α, β, slope, β_ci", α, β, slope, β_ci
+    @insp α, β, slope, β_ci
     return α, β, slope, β_ci
 end
 @info logitreg_pair
@@ -389,7 +391,7 @@ function logitreg(variants_df)
     end
     return df
 end
-@info logitreg
+@insp logitreg
 
 @info "--------"
 @info "計算結果保存用関数"
@@ -403,7 +405,7 @@ function save_jld2(region, variants_df, logitreg_df)
         jld2_file["logitreg_df"]        = logitreg_df
     end
 end
-@info save_jld2
+@insp save_jld2
 
 @info "--------"
 @info "メインルーチン"
@@ -411,31 +413,32 @@ end
 function main(region)
     @assert region ∈ capable_regions
     @info "========"
+    @info "メインルーチン"
+    @info "--------"
     @info "CSV ファイル読み込み"
     variants_df = load_csv(region)
-    @info "--------"
     @info "読み込んだデータフレーム"
-    @info variants_df
+    @insp variants_df
     @info "--------"
     @info "データ中の最新の日付"
     date_latest = variants_df.date_end[end]
-    @info "date_latest", date_latest
+    @insp date_latest
     date_latest_suffix_form = Dates.format(date_latest, "yymmdd")
-    @info "date_latest_suffix_form", date_latest_suffix_form
-    @info "========"
+    @insp date_latest_suffix_form
+    @info "--------"
     @info "統計量を算出"
     stat!(variants_df)
-    @info "size(variants_df)", size(variants_df)
-    @info "========"
+    @insp size(variants_df)
+    @info "--------"
     @info "パラメーター探索"
     logitreg_df = logitreg(variants_df)
-    @info "size(logitreg_df)", size(logitreg_df)
-    @info "========"
+    @insp size(logitreg_df)
+    @info "--------"
     @info "解析データ書き出し"
     @info "  データをJLD2形式のファイルとして出力する"
     save_jld2(region, variants_df, logitreg_df)
 end
-@info main
+@insp main
 
 @info "========"
 @info ""

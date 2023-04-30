@@ -310,12 +310,16 @@ end
 export has_name, requires
 
 #--------
-# ev
+# inspect
 
-macro @evexpr(expr)
-    print("$(string(expr)) = ")
-    esc(:(println($expr)))
+macro insp(expr)
+    str_expr = string(expr) # compile-time stringing of the expression
+    return quote # statements to be expanded to the caller
+        print("\e[34m[ Insp:\e[0m ") # with escape sequence to specify color
+        print($str_expr * " = ") # interpolate the expression string
+        println($(esc(expr))) # interpolate the expression
+    end
 end
-export @evexpr
+export @insp
 
 end #module
