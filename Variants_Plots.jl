@@ -232,7 +232,7 @@ function p_variant_logit_transitions_against_base_variant(
         bottom_margin=8px, left_margin=8px, top_margin=8px, right_margin=8px,
         title="$(base_variant_name) に対する他株の検出数比の推移（$(region_name)）",
         legend=:topleft,
-        fontfamily="Meiryo"
+        fontfamily="Meiryo",
     )
     # データ
     ts_i = date_to_value.(Date.(variants_df[:,"date_start"]); noon=false)
@@ -260,7 +260,6 @@ function p_variant_logit_transitions_against_base_variant(
     # x 軸設定
     x_axis_time!(p; start_date=start_date, end_date=end_date)
     x_axis_lims = collect(Plots.xlims(p))
-    plot!(p, collect(Plots.xlims(p)), [0.0, 0.0], label=:none, color=:black)
     # y 軸設定
     ytol = 0.2
     if isnothing(ymin) ymin0 = min(0.0, reduce(min, minimum.(skipmissing.(values(v_is))))) end
@@ -271,7 +270,8 @@ function p_variant_logit_transitions_against_base_variant(
     y_ticks = yticks(p)[1][1]
     ylabel!(p, "$(base_variant_name) 株の検出数に対する他の株の検出数の比の自然対数（ロジット）")
     # グリッド線と上辺をプロットの要素として重ね書き（twinx() のバクにより消されるため）
-    map(y -> plot!(p, x_axis_lims, [y]; label=:none, lc=:gray90), y_ticks)
+    map(y -> if y ≠ 0 plot!(p, x_axis_lims, [y]; label=:none, lc=:gray90) end, y_ticks)
+    plot!(p, x_axis_lims, [0.0], label=:none, color=:black)
     plot!(p, x_axis_lims, [ymax]; label=:none, lc=:black)    
     # プロット
     for var ∈ variant_names_to_be_plotted
@@ -358,6 +358,9 @@ end
 @info "---------"
 @info "メイン関数定義"
 
+# グローバル変数
+P = nothing
+
 function generate(region)
     @info "========"
     @info "プロット生成"
@@ -411,6 +414,7 @@ function generate(region)
         variant_names_to_be_plotted = ["BA.5", "XBB", "XBB.1.9.1"],
         start_date = Date("2023-02-15"), end_date = Date("2023-05-15"), ymin = -5.0, ymax = 1.5,
     )
+    global P = P
     return P
 end
 @insp generate
@@ -418,7 +422,7 @@ end
 @info "========"
 @info ""
 @info "Variants_Plots.generate(:tokyo) または Variants_Plots.generate(:osaka) として実行する"
-@info "返り値は Plots.Plot を値として持つ Dict 型変数"
+@info "プロットは全域変数 P とともに、返り値として返される Plots.Plot を値として持つ Dict 型変数"
 @info "一部のプロットは画像用ディレクトリに直ちに出力される"
 @info ""
 @info "========"
