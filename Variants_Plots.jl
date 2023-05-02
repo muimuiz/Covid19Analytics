@@ -74,7 +74,8 @@ const figdir = "CurrentFigs/"
 @info "描画色"
 
 @inline RGB256(r, g, b) = RGB(r/255, g/255, b/255)
-const cols = Dict(
+@insp RGB256
+const varcols = Dict(
     "BA.2"      => RGB256(236, 126,  42),
     "BA.5"      => RGB256(156, 196, 230),
     "BF.7"      => RGB256(255, 192,   0),
@@ -87,7 +88,7 @@ const cols = Dict(
     "XBB.1.9.1" => RGB256( 84, 132,  52),
     "XBB+1.9.1" => RGB256( 98,  88, 106),
 )
-@insp length(cols)
+@insp length(varcols)
 
 @info "========"
 @info "関数定義"
@@ -284,7 +285,7 @@ function p_variant_logit_transitions_against_base_variant(
         α   = lrows.α_j[1]
         β   = lrows.β_j[1]
         ts  = date_to_value.([start_date, end_date])
-        col = cols[var]
+        col = varcols[var]
         plot!(p,
             ts, α .+ β .* ts,
             label=:none, color=col, alpha=0.75,
@@ -319,7 +320,7 @@ function p_variant_logit_transitions_against_base_variant(
                         "%s の %s に対する\n対数増加率：%.3f /日",
                         var, base_variant_name, β
                     ),
-                    font("Meiryo", 9), cols[var], :left
+                    font("Meiryo", 9), varcols[var], :left
                 )
             )
         end

@@ -39,8 +39,23 @@ const confirmed_csv_filepaths = Dict(
 @insp confirmed_csv_filepaths
 
 @info "--------"
-@info "基準変異株名"
+@info "対象となる変異株名"
+const variant_names = [
+    "BA.2",
+    "BA.2.75",
+    "BA.5",
+    "BF.7",
+    "BN.1",
+    "BQ.1",
+    "BQ.1.1",
+    "XBB",
+    "XBB.1.5",
+    "XBB.1.9.1",
+    #"XBB+1.9.1",
+]
+@insp variant_names
 
+@info "基準変異株名"
 const base_variant_name = "BA.5"
 @insp base_variant_name
 
@@ -110,8 +125,8 @@ end
 
 # 確認者数データ confirmed_df から対数増加率トレンド値を抽出
 function get_t_Δlzs(confirmed_df, t_start, t_end)
-    t_i    = Missable{Float64}[]
-    Δlzs_i = Missable{Float64}[]
+    t_i    = Missable{Float64}[] # 時刻
+    Δlzs_i = Missable{Float64}[] # 時刻に対応する対数増加率トレンド値
     for row ∈ eachrow(confirmed_df)
         if !is_regular(row.t) || !is_regular(row.Δlzs) continue end
         if !(t_start ≤ row.t < t_end) continue end
@@ -127,7 +142,7 @@ end
 @info "対数増加率算出関数"
 
 # パラメーターから求めた対数増加率（定数分の不定性がある）
-# docs/varlogit.md 参照
+# 数学的関係について docs/varlogit.md 参照
 function est_Δlz(t, αs, βs)
     eλs = exp.(αs .+ βs .* t)
     return sum(βs .* eλs) / (1.0 + sum(eλs))
@@ -141,6 +156,8 @@ end
 confirmed_df = nothing
 pred_Δlzs    = nothing
 β0           = nothing
+var_names    = nothing
+pred_pss     = nothing
 
 function run(region)
     @info "========"
@@ -158,32 +175,50 @@ function run(region)
     @insp length(fit_Δlzs_i)
     @info "--------"
     @info "変異株別相対パラメーター"
-    bdf = logitreg_df[logitreg_df.base_variant .== base_variant_name,:] # base 変異株が BA.5 である行のみ収集
-    var_names = bdf.variant
-    var_αs = bdf.α_j
-    var_βs = bdf.β_j
-    @insp var_names
-    @insp var_αs
-    @insp var_βs
-    @assert length(var_names) == length(var_αs) == length(var_βs)
-    n_vars = length(var_names)
-    @insp n_vars
+    o0df = logitreg_df[logitreg_df.base_variant .== base_variant_name,:] # 基準株が一致するもののみ
+    ovars = filter(var -> var ≠ base_variant_name, variant_names) # 基準株を除いた変異株リスト
+    o1df = DataFrame(vcat([o0df[findfirst(o0df.variant .== var),:] for var ∈ ovars]))
+    ovar_names = o1df.variant # 各株 j の名前
+    ovar_αs    = o1df.α_j     # 各株 j の回帰パラメーター α_j
+    ovar_βs    = o1df.β_j     # 各株 j の回帰パラメーター β_j
+    @insp ovar_names
+    @insp ovar_αs
+    @insp ovar_βs
+    @assert length(ovar_names) == length(ovar_αs) == length(ovar_βs)
+    n_ovars = length(ovar_names)
+    @insp n_ovars
     @info "回帰パラメーターから求めた対数増加率"
-    var_Δlz_i = map(t -> est_Δlz(t, var_αs, var_βs), fit_t_i)
-    @insp length(var_Δlz_i)
+    ovar_Δlz_i = map(t -> est_Δlz(t, ovar_αs, ovar_βs), fit_t_i)
+    @insp length(ovar_Δlz_i)
     @info "フィッティングによる基準株対数増加率の推定"
-    β0 = mean(skipmissing(fit_Δlzs_i .- var_Δlz_i))
+    β0 = mean(skipmissing(fit_Δlzs_i .- ovar_Δlz_i))
     @insp β0
     @info "--------"
     @info "変異株の割合の変化にともなう感染力の変化に基づく対数増加率推定"
-    pred_Δlzs = map(t -> β0 + est_Δlz(t, var_αs, var_βs), pred_ts)
+    pred_Δlzs = map(t -> β0 + est_Δlz(t, ovar_αs, ovar_βs), pred_ts)
     @assert length(pred_ts) == length(pred_Δlzs)
     @insp length(pred_Δlzs)
+    @info "--------"
+    @info "各変異株の割合の推定"
+    var_names = vcat([base_variant_name], ovar_names)
+    @insp var_names
+    var_αs = vcat([0.0], ovar_αs)
+    var_βs = vcat([0.0], ovar_βs)
+    n_vars = length(var_names)
+    @assert n_vars == n_ovars + 1
+    @insp n_vars
+    rns_vars = [[exp(var_αs[j] + var_βs[j] * t) for t ∈ pred_ts] for j ∈ 1:n_vars]
+    rns_sum  = reduce(.+, rns_vars)
+    pred_pss = [rns_vars[j] ./ rns_sum for j ∈ 1:n_vars]
+    @assert n_vars == length(pred_pss)
+    @insp length(pred_pss)
     @info "--------"
     @info "全域変数設定"
     global confirmed_df = confirmed_df
     global pred_Δlzs    = pred_Δlzs
     global β0           = β0
+    global var_names    = var_names
+    global pred_pss     = pred_pss
 end
 @insp run
 
@@ -202,7 +237,7 @@ end
 @info "プロット時間範囲"
 
 const plot_earliest_start_date = Date("2022-12-31")
-const plot_latest_end_date     = Date("2023-06-02")
+const plot_latest_end_date     = Date("2023-07-02")
 @insp plot_earliest_start_date, plot_latest_end_date
 
 @info "--------"
@@ -226,6 +261,23 @@ const colors = [
     HSL(280.0, 1.0, 0.40), # 9
 ]
 @insp length(colors)
+
+@inline RGB256(r, g, b) = RGB(r/255, g/255, b/255)
+@insp RGB256
+const varcols = Dict(
+    "BA.2"      => RGB256(236, 126,  42),
+    "BA.5"      => RGB256(156, 196, 230),
+    "BF.7"      => RGB256(255, 192,   0),
+    "BN.1"      => RGB256(196,  90,  16),
+    "BQ.1.1"    => RGB256( 46, 116, 182),
+    "BA.2.75"   => RGB256(255, 104, 214),
+    "BQ.1"      => RGB256(168, 208, 142),
+    "XBB"       => RGB256(132, 152, 176),
+    "XBB.1.5"   => RGB256(112,  44, 160),
+    "XBB.1.9.1" => RGB256( 84, 132,  52),
+    "XBB+1.9.1" => RGB256( 98,  88, 106),
+)
+@insp length(varcols)
 
 @info "========"
 @info "プロット用関数定義"
@@ -291,6 +343,19 @@ function x_axis_time!(
 end
 @insp x_axis_time!
 
+@info "積み上げ面グラフ描画関数（ribbon を利用する）"
+function stacked_area!(p::UPlot, x, ys; lc, fcs)
+    @assert length(ys) == length(fcs)
+    nj = length(ys)
+    z  = fill(0.0, length(ys[1]))
+    ays = accumulate(.+, ys)
+    for j ∈ 1:nj
+        plot!(p, x, ays[j]; ribbon=(ys[j], z), lc=lc, fc=fcs[j], label=:none)
+    end
+    return p
+end
+@insp stacked_area!
+
 @info "--------"
 @info "確認感染者数データと変異株回帰パラメーターからの対数増加率比較プロット関数"
 
@@ -315,7 +380,7 @@ function p_log_growth_comparison(
     # x 軸設定
     x_axis_time!(p; start_date=start_date, end_date=end_date)
     x_axis_lims = collect(Plots.xlims(p))
-    plot!(p, collect(Plots.xlims(p)), [0.0, 0.0], label=:none, color=:black)
+    plot!(p, collect(Plots.xlims(p)), [0.0], label=:none, color=:black)
     # y 軸設定
     # 最小・最大値をデータの範囲から決定
     ymin, ymax = (function(v_t)
@@ -334,7 +399,7 @@ function p_log_growth_comparison(
     end)(ymin, ymax)
     @insp y_ticks
     ylims!(p, ymin, ymax)
-    yticks!(p, y_ticks, map(v -> @sprintf("%g", v), y_ticks))
+    yticks!(p, y_ticks, map(v -> replace(@sprintf("%g", v), "-" => "－"), y_ticks))
     ylabel!(p, "感染者 対数増加率 [/日]")
     # グリッド線と上辺をプロットの要素として重ね書き（twinx() のバクにより消されるため）
     map(y -> if y ≠ 0 plot!(p, x_axis_lims, [y]; label=:none, lc=:gray90) end, y_ticks)
@@ -356,6 +421,7 @@ function p_log_growth_comparison(
         text(
             """
             データソース: 変異株比の元データは東京都資料より.
+            検出数が小さいいくつかの変異株の区分を除く.
             感染確認者数は厚労省「新規陽性者数の推移（日別）」より.
             変異株比からの対数増加率推移の推定は定数分の任意性がある.
             基準とした $(base_variant_name) の増加率を $(@sprintf("%.3f", β0)) とした場合.
@@ -379,6 +445,63 @@ function p_log_growth_comparison(
     return p
 end
 @insp p_log_growth_comparison
+
+@info "--------"
+@info "変異株回帰パラメーターから推定される変異株の割合の積み上げ面プロット関数"
+
+function p_stacked_area_variant_proportions(
+    region, var_names, pred_pss;
+    start_date = plot_earliest_start_date,
+    end_date = plot_latest_end_date,
+)
+    region_name = Dict(:tokyo => "東京", :osaka => "大阪")[region]
+    p = plot(
+        size=(640, 600),
+        framestyle=:box,
+        bottom_margin=8px, left_margin=8px, top_margin=8px, right_margin=8px,
+        title="変異株比から推定される変異株の割合の推移（$(region_name)）",
+        legend=:topleft,
+        fontfamily="Meiryo",
+    )
+    # データ
+    pc_rpss = map(ps -> 100.0 * ps, reverse(pred_pss))
+    ac_rpss = accumulate(.+, pc_rpss)
+    @assert length(pc_rpss) == length(ac_rpss)
+    # x 軸設定
+    x_axis_time!(p; start_date=start_date, end_date=end_date)
+    # y 軸設定
+    ylims!(p, 0.0, 100.0)
+    ylabel!(p, "変異株割合 [%]")
+    # プロット
+    stacked_area!(
+        p, pred_ts, pc_rpss;
+        lc=:black, fcs=reverse([varcols[var] for var ∈ reverse(var_names)]),
+    )
+    # ラベル
+    il = length(pc_rpss[1]) ÷ 4
+    ir = 3 * il
+    @insp il, ir
+    for (j, var) ∈ enumerate(reverse(var_names))
+        if pc_rpss[j][il] > pc_rpss[j][ir]
+            lx = 0.25
+            ly = (ac_rpss[j][il] - pc_rpss[j][il] / 2.0) / 100.0
+        else
+            lx = 0.75
+            ly = (ac_rpss[j][ir] - pc_rpss[j][ir] / 2.0) / 100.0
+        end
+        annotate!(p, rx(p, lx), ry(p, ly), text(var, font("Meiryo",8), :black, :center))
+    end
+    # アノテーション
+    annotate!(p, rx(p, 0.45), ry(p, 0.04),
+        text(
+            """
+            データソース: 変異株比の元データは東京都資料より.
+            検出数が小さいいくつかの変異株の区分を除く.
+            """,
+            font("Meiryo",7), RGB(0.3,0.3,0.3), :left
+        )
+    )
+end
 
 @info "--------"
 @info "プロット用メイン関数定義"
@@ -406,7 +529,11 @@ function generate(region)
     @info "プロット生成"
     @info "log_growth_comparison"
     P[:log_growth_comparison] = p_log_growth_comparison(
-        region, confirmed_df, pred_Δlzs, β0
+        region, confirmed_df, pred_Δlzs, β0,
+    )
+    @info "stack_area_variant_proportions"
+    P[:stack_area_variant_proportions] = p_stacked_area_variant_proportions(
+        region, var_names, pred_pss,
     )
     @info "--------"
     @info "全域変数設定"
