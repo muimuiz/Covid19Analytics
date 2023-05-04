@@ -42,6 +42,7 @@ const variant_names = [
     "BQ.1",
     "BQ.1.1",
     "XBB",
+    "XBB_old",
     "XBB.1.5",
     "XBB.1.9.1",
     "XBB+1.9.1",
