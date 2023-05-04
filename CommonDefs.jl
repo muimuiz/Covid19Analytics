@@ -39,6 +39,15 @@ export ArrayMissing, VectorMissing, MatrixMissing, Array2Missing, Array3Missing
 export is_regular
 
 #--------
+# nested vectors
+
+NestedVector{T} = Vector{Vector{T}}
+export NestedVector
+Nest2Vector{T} = NestedVector{T}
+Nest3Vector{T} = Vector{Vector{Vector{T}}}
+export Nest2Vector, Nest3Vector
+
+#--------
 # mutind
 
 function mutind(usvs1::Vector{<:Missable{T}}, usvs2::Vector{<:Missable{T}}) where T <: Any
