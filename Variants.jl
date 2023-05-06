@@ -25,63 +25,29 @@ using ..CommonDefs
 @info "作業ディレクトリ"
 @insp pwd()
 
+@info "========"
+@info "定数"
+
 @info "--------"
 @info "指定可能な対象地域"
 
-const capable_regions = [:tokyo, :osaka]
-@insp capable_regions
-
-@info "--------"
-@info "対象となる変異株名"
-const variant_names = [
-    "BA.2",
-    "BA.2.75",
-    "BA.5",
-    "BF.7",
-    "BN.1",
-    "BQ.1",
-    "BQ.1.1",
-    "XBB",
-    "XBB_old",
-    "XBB.1.5",
-    "XBB.1.9.1",
-    "XBB+1.9.1",
-]
-@insp variant_names
-
-@info "比較基準となる変異株名"
-const base_variant_names = [
-    "BA.5",
-    "BF.7",
-    "BN.1",
-    "BQ.1.1",
-    "XBB.1.5",
-]
-@insp base_variant_names
-@assert base_variant_names ⊆ variant_names
-
-@info "--------"
-@info "予測させる時刻範囲"
-
-const predict_date_range = Date("2022-11-01"):Day(1):Date("2023-07-01")
-@insp predict_date_range
-const predict_ts = date_to_value.(predict_date_range)
-@insp length(predict_ts)
+const CAPABLE_REGION_SYMBOLS = [:tokyo, :osaka]
+@insp CAPABLE_REGION_SYMBOLS
 
 @info "--------"
 @info "データファイル"
 
-const csv_filepaths = Dict(
+const INPUT_CSV_FILEPATHS = Dict(
     :tokyo => "./東京変異株.csv",
     :osaka => "./大阪変異株.csv",
 )
-@insp csv_filepaths
-@info "  \"$(csv_filepaths[:tokyo])\" はおそらく感染研に依頼したゲノム解析の結果のデータ"
+@insp INPUT_CSV_FILEPATHS
+@info "  \"$(INPUT_CSV_FILEPATHS[:tokyo])\" はおそらく感染研に依頼したゲノム解析の結果のデータ"
 @info "  都PDF資料からGoogleスプレッドシートに手入力しCSV出力したもの"
 @info "  cf. https://www.fukushihoken.metro.tokyo.lg.jp/iryo/kansen/corona_portal/henikabu/screening.html"
 @info "      https://www.bousai.metro.tokyo.lg.jp/taisaku/saigai/1021348/index.html"
 @info "      https://docs.google.com/spreadsheets/d/1WKMmu_2Ba_IZgsjgL6GhDgR5mdQDG2WxYXVsgCEGl9Q/edit?usp=sharing"
-@info "  \"$(csv_filepaths[:osaka])\" も同じく感染研に依頼したゲノム解析の結果のデータ"
+@info "  \"$(INPUT_CSV_FILEPATHS[:osaka])\" も同じく感染研に依頼したゲノム解析の結果のデータ"
 @info "  日付は「結果判明日」であり、検体が採取された日はこれより数週前と思われる"
 @info "  府PDF資料からGoogleスプレッドシートに手入力しCSV出力したもの"
 @info "  cf. https://www.pref.osaka.lg.jp/iryo/osakakansensho/happyo.html"
@@ -91,25 +57,67 @@ const csv_filepaths = Dict(
 @info "--------"
 @info "出力ファイル"
 
-const jld2_filepaths = Dict(
+const OUTPUT_JLD2_FILEPATHS = Dict(
     :tokyo => "./variants_latest_tokyo.jld2",
     :osaka => "./variants_latest_osaka.jld2",
 )
-@insp jld2_filepaths
+@insp OUTPUT_JLD2_FILEPATHS
+
+@info "--------"
+@info "対象となる変異株名"
+const VARIANT_NAMES_v = [
+    "BA.2",
+    "BA.2.75",
+    "BA.5",
+    "BF.7",
+    "BN.1",
+    "BQ.1",
+    "BQ.1.1",
+    "XBB_old",
+    "XBB.1.5",
+    "XBB.1.9.1",
+    "XBB+1.9.1",
+    "XBB",
+]
+@insp VARIANT_NAMES_v
+
+@info "比較基準となる変異株名"
+const BASE_VARIANT_NAMES_bv = [
+    "BA.5",
+    "BF.7",
+    "BN.1",
+    "BQ.1.1",
+    "XBB.1.5",
+]
+@insp BASE_VARIANT_NAMES_bv
+@assert BASE_VARIANT_NAMES_bv ⊆ VARIANT_NAMES_v
+
+@info "--------"
+@info "予測させる時刻範囲"
+
+const PREDICTION_DATE_START = Date("2022-11-01")
+const PREDICTION_DATE_END   = Date("2023-07-01")
+@insp PREDICTION_DATE_START, PREDICTION_DATE_END
+const PREDICTION_DATES_pt   = PREDICTION_DATE_START:Day(1):PREDICTION_DATE_END
+const PREDICTION_TVALUES_pt = date_to_value.(PREDICTION_DATES_pt)
+@insp PREDICTION_DATES_pt
+@insp length(PREDICTION_TVALUES_pt)
 
 @info "========"
 @info "関数定義"
+@info "  主要データは module 内の全域変数により共有される"
+@info "  （module をクラスの単一インスタンスのように扱う）"
 
 @info "--------"
 @info "データ読み込み用関数"
 
-function load_csv(region)
+Variants_DF = nothing
+
+function load_csv(filepath)
     @info "--------"
     @info "CSV ファイルを読み込み、必要な列を選別して DataFrame として返す"
-    @info "region", region
     @info "--------"
     @info "CSV 読込み"
-    filepath = csv_filepaths[region]
     @insp filepath
     csv_df = CSV.read(filepath, DataFrame; missingstring="")
     @insp size(csv_df)
@@ -123,49 +131,53 @@ function load_csv(region)
     df.date_end   = csv_df.date_end
     @assert all(df.date_start .≤ df.date_end)
     @info "変異株数のコピー"
-    for var ∈ variant_names
-        if !has_name(csv_df, var) continue end
-        @insp var
-        df[:,var] = csv_df[:,var]
+    for vn ∈ VARIANT_NAMES_v
+        if !has_name(csv_df, vn)
+            @warn "CSV $(filepath) は $(vn) のカラムを持たない"
+            continue
+        end
+        df[:,vn] = csv_df[:,vn]
     end
     @insp size(df)
-    return df
+    global Variants_DF = df
 end
-@info load_csv
+@insp load_csv
 
 @info "--------"
 @info "データ処理関数"
 
-function stat!(variants_df)
+function stat!()
     @info "--------"
     @info "変異株間のオッズその他の統計量を算出する"
-    n_rows = nrow(variants_df)
+    n_rows = nrow(Variants_DF)
     @insp n_rows
     @info "--------"
     @info "変異株間のオッズ (VAR1_VAR2_odds)、信頼区間 (VAR1_VAR2_odds_(cil|ciu))"
-    for (var1, var2) in combinations(variant_names, 2)
-        if !has_name(variants_df, var1) || !has_name(variants_df, var2) continue end
-        @insp var1, var2
-        k1s = variants_df[!,var1]
-        k2s = variants_df[!,var2]
-        odds = k1s ./ k2s
-        variants_df[!,"$(var1)_$(var2)_odds"]  = odds
-        variants_df[!,"$(var1)_$(var2)_logit"] = log.(odds)
-        ns  = k1s .+ k2s
-        cls = VectorMissing(Float64, n_rows)
-        cus = VectorMissing(Float64, n_rows)
-        for i in 1:n_rows
-            if ismissing(k1s[i]) || ismissing(k2s[i]) continue end
-            (cls[i], cus[i]) = 1.0 ./ (1.0 ./ confint(BinomialTest(k1s[i], ns[i])) .- 1.0)
+    for (vn1, vn2) in combinations(VARIANT_NAMES_v, 2)
+        if !has_name(Variants_DF, vn1) || !has_name(Variants_DF, vn2)
+            @warn "Variants_DF は $(vn1), $(vn2) の対を持たない"
+            continue
         end
-        variants_df[!,"$(var1)_$(var2)_odds_cil"]  = cls
-        variants_df[!,"$(var1)_$(var2)_odds_ciu"]  = cus
-        variants_df[!,"$(var1)_$(var2)_logit_cil"] = log.(cls)
-        variants_df[!,"$(var1)_$(var2)_logit_ciu"] = log.(cus)
+        k1_vt = Variants_DF[!,vn1]
+        k2_vt = Variants_DF[!,vn2]
+        odds_vt = k1_vt ./ k2_vt
+        global Variants_DF[!,"$(vn1)_$(vn2)_odds"]  = odds_vt
+        global Variants_DF[!,"$(vn1)_$(vn2)_logit"] = log.(odds_vt)
+        n_vt  = k1_vt .+ k2_vt
+        cl_vt = VectorMissing(Float64, n_rows)
+        cu_vt = VectorMissing(Float64, n_rows)
+        for vt in 1:n_rows
+            if ismissing(k1_vt[vt]) || ismissing(k2_vt[vt]) continue end
+            (cl_vt[vt], cu_vt[vt]) = 1.0 ./ (1.0 ./ confint(BinomialTest(k1_vt[vt], n_vt[vt])) .- 1.0)
+        end
+        global Variants_DF[!,"$(vn1)_$(vn2)_odds_cil"]  = cl_vt
+        global Variants_DF[!,"$(vn1)_$(vn2)_odds_ciu"]  = cu_vt
+        global Variants_DF[!,"$(vn1)_$(vn2)_logit_cil"] = log.(cl_vt)
+        global Variants_DF[!,"$(vn1)_$(vn2)_logit_ciu"] = log.(cu_vt)
     end
-    return variants_df
 end
 @insp stat!
+@info "全域変数 Variants_DF を直接操作する意味で関数名に \"!\" を付す（Julia の習慣とは異なる）"
 
 @info "--------"
 @info "時刻区間代表値計算用関数"
@@ -242,32 +254,32 @@ end
 function newton_raphson_method(df, α, β)
     # 時間のスケール
     N  = nrow(df)
-    mt = mean(df.t)
-    σt  = stdm(df.t, mt; corrected=false)
+    mt = mean(df.t_vt)
+    σt  = stdm(df.t_vt, mt; corrected=false)
     σt′ = tan(((N - 1) / N) * (π / 2.0)) / sqrt(3.0)
     rt  = σt / σt′
-    t′ss = (df.ts .- mt) ./ rt
-    t′es = (df.te .- mt) ./ rt
+    t′s_vt = (df.ts_vt .- mt) ./ rt
+    t′e_vt = (df.te_vt .- mt) ./ rt
     α′ = α + β * mt 
     β′ = β * rt
     # 探索ループ
     #rate = 0.01
     #desc = false
-    t′s = t_star.(t′ss, t′es, α′, β′)
-    ℓ′  = ℓ_binom(df.n, df.k1, t′s, α′, β′)
-    ∇ℓ′ = ∇ℓ_binom(df.n, df.k1, t′s, α′, β′)
+    t′_vt = t_star.(t′s_vt, t′e_vt, α′, β′)
+    ℓ′  = ℓ_binom(df.n_vt, df.k1_vt, t′_vt, α′, β′)
+    ∇ℓ′ = ∇ℓ_binom(df.n_vt, df.k1_vt, t′_vt, α′, β′)
     slope = norm(∇ℓ′)
     for j in 1:1000
         θ′_prev = [α′, β′]
-        H′ = Hesse_ℓ(df.n, df.k1, t′s, α′, β′)
+        H′ = Hesse_ℓ(df.n_vt, df.k1_vt, t′_vt, α′, β′)
         if abs(det(H′)) < 1e-8 @warn "H′, det(H′)", H′, det(H′) end
         α′, β′ = θ′_prev .- (inv(H′) * ∇ℓ′)
         ℓ′_prev = ℓ′
-        ℓ′ = ℓ_binom(df.n, df.k1, t′s, α′, β′)
+        ℓ′ = ℓ_binom(df.n_vt, df.k1_vt, t′_vt, α′, β′)
         #desc_prev = desc
         #desc = (ℓ′_prev > ℓ′)
         #rate *= (!desc && desc_prev) ? 0.6 : 0.999
-        ∇ℓ′ = ∇ℓ_binom(df.n, df.k1, t′s, α′, β′)
+        ∇ℓ′ = ∇ℓ_binom(df.n_vt, df.k1_vt, t′_vt, α′, β′)
         slope = norm(∇ℓ′)
         if (slope < 1e-8) || (θ′_prev == [α′, β′]) break end
     end
@@ -280,34 +292,36 @@ end
 @info "--------"
 @info "ロジスティック回帰用関数"
 
+LogitReg_DF = nothing
+
 # 2株間の回帰パラメーター探索
-function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
+function logitreg_pair(vn1, vn2; method=:glm_julia)
     @info "--------"
-    @info "$(varname1), $(varname2) 間、ロジスティック回帰パラメーター探索 ($(method))"
+    @info "$(vn1), $(vn2) 間、ロジスティック回帰パラメーター探索 ($(method))"
     @info "--------"
     @info "対象行の抜き出し"
     df = DataFrame()
-    df.ts = date_to_value.(variants_df.date_start; noon=false)
-    df.te = date_to_value.(variants_df.date_end;   noon=false) .+ 1.0
-    df.k1 = variants_df[:,varname1]
-    df.k2 = variants_df[:,varname2]
-    df.n  = df.k1 .+ df.k2
-    dropmissing!(df, :n)
-    filter!(row -> row.n != 0, df)
-    N = nrow(df)
-    @insp N
-    @assert N ≥ 2
-    df.t_mid = (df.ts .+ df.te) ./ 2.0
-    df.prop  = df.k1 ./ df.n
-    df.odds  = df.k1 ./ df.k2
-    df.logit = log.(df.odds)
+    df.ts_vt = date_to_value.(Variants_DF.date_start; noon=false)
+    df.te_vt = date_to_value.(Variants_DF.date_end;   noon=false) .+ 1.0
+    df.k1_vt = Variants_DF[:,vn1]
+    df.k2_vt = Variants_DF[:,vn2]
+    df.n_vt  = df.k1_vt .+ df.k2_vt
+    dropmissing!(df, :n_vt)
+    filter!(row -> row.n_vt ≠ 0, df)
+    n_row = nrow(df)
+    @insp n_row
+    @assert n_row ≥ 2
+    df.tc_vt   = (df.ts_vt .+ df.te_vt) ./ 2.0
+    df.p_vt    = df.k1_vt ./ df.n_vt
+    df.odds_vt = df.k1_vt ./ df.k2_vt
+    df.λ_vt    = log.(df.odds_vt)
     @info "--------"
     @info "初期パラメーター"
-    ir = is_regular.(df.logit)
-    α, β = linear_regression(df.t_mid[ir], df.logit[ir])
+    rt_vt = is_regular.(df.λ_vt)
+    α, β = linear_regression(df.tc_vt[rt_vt], df.λ_vt[rt_vt])
     @insp α, β
     @assert is_regular(α) && is_regular(β)
-    df.t = df.t_mid
+    df.t_vt = df.tc_vt
     @info "--------"
     @info "探索ループ"
     β_ci = nothing
@@ -315,12 +329,12 @@ function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
         α_prev, β_prev = α, β
         start = [α, β]
         if     method == :glm_julia
-            glm_result = glm(@formula(prop ~ 1 + t), df, Binomial(), LogitLink(); wts=df.n, start=start)
+            glm_result = glm(@formula(p_vt ~ 1 + t_vt), df, Binomial(), LogitLink(); wts=df.n_vt, start=start)
             α, β = coef(glm_result)
             β_ci = confint(glm_result)[2,:]
         elseif method == :glm_r
             R"""
-            glm_result <- glm(cbind(k1,k2) ~ 1 + t, $df, family=binomial(link="logit"), start=$start)
+            glm_result <- glm(cbind(k1_vt,k2_vt) ~ 1 + t_vt, $df, family=binomial(link="logit"), start=$start)
             coefs <- coef(glm_result)
             cis <- confint(glm_result)
             """
@@ -330,17 +344,17 @@ function logitreg_pair(variants_df, varname1, varname2; method=:glm_julia)
             α, β = newton_raphson_method(df, α, β)
         end
         if abs(α - α_prev) < 1e-10 && abs(β - β_prev) < 1e-12 break end
-        df.t = t_star.(df.ts, df.te, α, β)
+        df.t_vt = t_star.(df.ts_vt, df.te_vt, α, β)
     end
     @info "-------"
     @info "近似結果"
-    slope = norm(∇ℓ_binom(df.n, df.k1, df.t, α, β))
+    slope = norm(∇ℓ_binom(df.n_vt, df.k1_vt, df.t_vt, α, β))
     @insp α, β, slope, β_ci
     return α, β, slope, β_ci
 end
 @info logitreg_pair
 
-function logitreg(variants_df)
+function logitreg()
     @info "--------"
     @info "基準株に対する他の株のロジスティック回帰"
     df = DataFrame(
@@ -358,16 +372,16 @@ function logitreg(variants_df)
         β_s     = Float64[],
         slope_s = Float64[],
     )
-    for base ∈ base_variant_names
-        if !has_name(variants_df, base) continue end
-        for var ∈ variant_names
-            if !has_name(variants_df, var) continue end
-            if var == base continue end
-            α_j, β_j, slope_j, β_ci_j = logitreg_pair(variants_df, var, base; method=:glm_julia)
-            α_r, β_r, slope_r, β_ci_r = logitreg_pair(variants_df, var, base; method=:glm_r)
-            α_s, β_s, slope_s, β_ci_s = logitreg_pair(variants_df, var, base; method=:nrm)
+    for bvn ∈ BASE_VARIANT_NAMES_bv
+        if !has_name(Variants_DF, bvn) continue end
+        for vn ∈ VARIANT_NAMES_v
+            if !has_name(Variants_DF, vn) continue end
+            if bvn == vn continue end
+            α_j, β_j, slope_j, β_ci_j = logitreg_pair(vn, bvn; method=:glm_julia)
+            α_r, β_r, slope_r, β_ci_r = logitreg_pair(vn, bvn; method=:glm_r)
+            α_s, β_s, slope_s, β_ci_s = logitreg_pair(vn, bvn; method=:nrm)
             push!(df, [
-                var, base,
+                vn, bvn,
                 α_j, β_j, slope_j, β_ci_j,
                 α_r, β_r, slope_r, β_ci_r,
                 α_s, β_s, slope_s,
@@ -390,20 +404,21 @@ function logitreg(variants_df)
             @warn "glm_julia と nrm の結果は一致しない ($(row.α_j), $(row.β_j)), ($(row.α_s), $(row.β_s))"
         end
     end
-    return df
+    global LogitReg_DF = df
 end
 @insp logitreg
 
 @info "--------"
 @info "計算結果保存用関数"
 
-function save_jld2(region, variants_df, logitreg_df)
-    filepath = jld2_filepaths[region]
+function save_jld2(filepath)
+    @info "計算結果を JLD2 形式で $(filepath) に出力する"
     jldopen(filepath, "w") do jld2_file
-        jld2_file["variant_names"]      = variant_names
-        jld2_file["base_variant_names"] = base_variant_names
-        jld2_file["variants_df"]        = variants_df
-        jld2_file["logitreg_df"]        = logitreg_df
+        jld2_file["VARIANT_NAMES_v"]       = VARIANT_NAMES_v
+        jld2_file["BASE_VARIANT_NAMES_bv"] = BASE_VARIANT_NAMES_bv
+        jld2_file["Variants_DF"]           = Variants_DF
+        jld2_file["LogitReg_DF"]           = LogitReg_DF
+        @insp keys(jld2_file)
     end
 end
 @insp save_jld2
@@ -411,33 +426,38 @@ end
 @info "--------"
 @info "メインルーチン"
 
-function main(region)
-    @assert region ∈ capable_regions
+RegionSymbol = nothing
+
+function main(region_symbol)
     @info "========"
     @info "メインルーチン"
+    @assert region_symbol ∈ CAPABLE_REGION_SYMBOLS
     @info "--------"
     @info "CSV ファイル読み込み"
-    variants_df = load_csv(region)
+    load_csv(INPUT_CSV_FILEPATHS[region_symbol])
     @info "読み込んだデータフレーム"
-    @insp variants_df
+    @insp Variants_DF
     @info "--------"
     @info "データ中の最新の日付"
-    date_latest = variants_df.date_end[end]
+    date_latest = Variants_DF.date_end[end]
     @insp date_latest
     date_latest_suffix_form = Dates.format(date_latest, "yymmdd")
     @insp date_latest_suffix_form
     @info "--------"
     @info "統計量を算出"
-    stat!(variants_df)
-    @insp size(variants_df)
+    stat!()
+    @insp size(Variants_DF)
     @info "--------"
     @info "パラメーター探索"
-    logitreg_df = logitreg(variants_df)
-    @insp size(logitreg_df)
+    logitreg()
+    @insp size(LogitReg_DF)
     @info "--------"
     @info "解析データ書き出し"
     @info "  データをJLD2形式のファイルとして出力する"
-    save_jld2(region, variants_df, logitreg_df)
+    save_jld2(OUTPUT_JLD2_FILEPATHS[region_symbol])
+    @info "--------"
+    @info "全域変数設定"
+    global RegionSymbol = region_symbol
 end
 @insp main
 
