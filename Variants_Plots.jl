@@ -25,18 +25,24 @@ using ..CommonDefs
 @info "定数"
 
 @info "--------"
+@info "指定可能な対象地域"
+
+const CAPABLE_REGION_SYMBOLS = [:tokyo, :osaka]
+@insp CAPABLE_REGION_SYMBOLS
+
+@info "--------"
 @info "解析データ"
 
-const input_jld2_filepaths = Dict(
+const INPUT_JLD2_FILEPATHS = Dict(
     :tokyo => "variants_latest_tokyo.jld2",
     :osaka => "variants_latest_osaka.jld2",
 )
-@insp input_jld2_filepaths
+@insp INPUT_JLD2_FILEPATHS
 
 @info "--------"
 @info "プロットする変異株"
 
-const variant_names_to_be_plotted = [
+const VARIANT_NAMES_TO_BE_PLOTTED_v = [
 #    "BA.2",
 #    "BA.2.75",
     "BA.5",
@@ -49,14 +55,14 @@ const variant_names_to_be_plotted = [
     "XBB.1.9.1",
     "XBB+1.9.1",
 ]
-@insp variant_names_to_be_plotted
+@insp VARIANT_NAMES_TO_BE_PLOTTED_v
 
 @info "--------"
 @info "プロット時間範囲"
 
-const plot_earliest_start_date = Date("2022-10-31")
-const plot_latest_end_date     = Date("2023-06-02")
-@insp plot_earliest_start_date, plot_latest_end_date
+const PLOT_DATE_START = Date("2022-10-31")
+const PLOT_DATE_END   = Date("2023-06-02")
+@insp PLOT_DATE_START, PLOT_DATE_END
 
 @info "--------"
 @info "プロットとサブプロットの合併型定義"
@@ -67,15 +73,15 @@ UPlot = Union{Plots.Plot,Plots.Subplot}
 @info "--------"
 @info "画像出力ディレクトリ"
 
-const figdir = "CurrentFigs/"
-@insp figdir
+const FIGURE_DIRECTORY = "CurrentFigs/"
+@insp FIGURE_DIRECTORY
 
 @info "--------"
 @info "描画色"
 
 @inline RGB256(r, g, b) = RGB(r/255, g/255, b/255)
 @insp RGB256
-const varcols = Dict(
+const VARIANT_COLORS_vn = Dict(
     "BA.2"      => RGB256(236, 126,  42),
     "BA.5"      => RGB256(156, 196, 230),
     "BF.7"      => RGB256(255, 192,   0),
@@ -88,23 +94,27 @@ const varcols = Dict(
     "XBB.1.9.1" => RGB256( 84, 132,  52),
     "XBB+1.9.1" => RGB256( 98,  88, 106),
 )
-@insp length(varcols)
+@insp length(VARIANT_COLORS_vn)
 
 @info "========"
 @info "関数定義"
 
+RegionSymbol = nothing
+
 @info "--------"
 @info "データ読み込み用関数"
 
+Variants_DF = nothing
+LogitReg_DF = nothing
+
+# 変異株回帰 jld2 データ読み込み
 function load_jld2(filepath)
+    @info "JLD2 ファイル $(filepath) を読み込み、全域変数 Variants_DF, LogitReg_DF を設定"
     jld2_data = load(filepath)
-    D = Dict{Symbol,Any}()
-    for k ∈ keys(jld2_data)
-        D[Symbol(k)] = jld2_data[k]
-    end
-    variants_df = D[:variants_df]
-    logitreg_df = D[:logitreg_df]
-    return variants_df, logitreg_df
+    global Variants_DF = jld2_data["Variants_DF"]
+    global LogitReg_DF = jld2_data["LogitReg_DF"]
+    @insp nrow(Variants_DF)
+    @insp nrow(LogitReg_DF), names(LogitReg_DF)
 end
 @insp load_jld2
 
@@ -170,14 +180,14 @@ end
 function x_axis_time!(
     p::UPlot;
     recent = nothing,
-    start_date = plot_earliest_start_date,
-    end_date   = plot_latest_end_date,
+    date_start = PLOT_DATE_START,
+    date_end   = PLOT_DATE_END,
 )
-    date_end   = end_date
-    date_start = (isnothing(recent)) ? start_date : date_end - Day(recent) 
-    t_start = dtime_to_value(DateTime(date_start))
-    t_end   = dtime_to_value(DateTime(date_end))
-    xlims!(p, t_start, t_end)
+    if !isnothing(recent) date_start = max(date_start, date_end - Day(recent)) end
+    @insp date_start, date_end
+    tvalue_start = dtime_to_value(DateTime(date_start))
+    tvalue_end   = dtime_to_value(DateTime(date_end))
+    xlims!(p, tvalue_start, tvalue_end)
     if isa(p, Plots.Plot)
         days = date_end - date_start
         if     days < Day(14)
@@ -202,7 +212,7 @@ function x_axis_time!(
         labels = String[]
         for d in sort(collect(keys(ticks_dict)))
             t = dtime_to_value(DateTime(d) + Hour(12))
-            if t_start ≤ t ≤ t_end
+            if tvalue_start ≤ t ≤ tvalue_end
                 push!(ts, t)
                 push!(labels, ticks_dict[d])
             end
@@ -216,17 +226,16 @@ end
 @info "--------"
 @info "基準株に対する他の株のロジットの時間推移プロット関数"
 
-function p_variant_logit_transitions_against_base_variant(
-    region, variants_df, logitreg_df;
+function p_variant_logit_transitions_against_base_variant(;
     base_variant_name = "BA.5",
-    variant_names_to_be_plotted = variant_names_to_be_plotted,
-    start_date = plot_earliest_start_date,
-    end_date = plot_latest_end_date,
+    variant_names_to_be_plotted_v = VARIANT_NAMES_TO_BE_PLOTTED_v,
+    date_start = PLOT_DATE_START,
+    date_end   = PLOT_DATE_END,
     ymin = nothing,
     ymax = nothing,
     value_annotations = [],
 )
-    region_name = Dict(:tokyo => "東京", :osaka => "大阪")[region]
+    region_name = Dict(:tokyo => "東京", :osaka => "大阪")[RegionSymbol]
     p = plot(
         size=(640, 600),
         framestyle=:box,
@@ -236,35 +245,36 @@ function p_variant_logit_transitions_against_base_variant(
         fontfamily="Meiryo",
     )
     # データ
-    ts_i = date_to_value.(Date.(variants_df[:,"date_start"]); noon=false)
-    te_i = date_to_value.(Date.(variants_df[:,"date_end"]);   noon=false) .+ 1.0
-    tm_i = (ts_i .+ te_i) ./ 2.0
-    v_is  = Dict{String, Vector}()
-    vl_is = Dict{String, Vector}()
-    vu_is = Dict{String, Vector}()
-    for varname ∈ variant_names_to_be_plotted
-        if varname == base_variant_name continue end
-        if !has_name(variants_df, varname) continue end
-        if varname ∉ variant_names_to_be_plotted continue end
-        logitname_for = "$(varname)_$(base_variant_name)_logit"
-        logitname_rev = "$(base_variant_name)_$(varname)_logit"
-        if     has_name(variants_df, logitname_for)
-            v_is[varname]  =    variants_df[:,logitname_for]
-            vl_is[varname] =    variants_df[:,logitname_for * "_cil"]
-            vu_is[varname] =    variants_df[:,logitname_for * "_ciu"]
-        elseif has_name(variants_df, logitname_rev)
-            v_is[varname]  = .- variants_df[:,logitname_rev]
-            vl_is[varname] = .- variants_df[:,logitname_rev * "_cil"]
-            vu_is[varname] = .- variants_df[:,logitname_rev * "_ciu"]
+    ts_vt = date_to_value.(Date.(Variants_DF[:,"date_start"]); noon=false)
+    te_vt = date_to_value.(Date.(Variants_DF[:,"date_end"]);   noon=false) .+ 1.0
+    tc_vt = (ts_vt .+ te_vt) ./ 2.0
+    λe_vt_vn = Dict{String, Vector}()
+    λl_vt_vn = Dict{String, Vector}()
+    λu_vt_vn = Dict{String, Vector}()
+    for vn ∈ variant_names_to_be_plotted_v
+        if vn == base_variant_name continue end
+        if !has_name(Variants_DF, vn) continue end
+        λn_for = "$(vn)_$(base_variant_name)_logit"
+        λn_rev = "$(base_variant_name)_$(vn)_logit"
+        if     has_name(Variants_DF, λn_for)
+            λe_vt_vn[vn] =    Variants_DF[:,λn_for]
+            λl_vt_vn[vn] =    Variants_DF[:,λn_for * "_cil"]
+            λu_vt_vn[vn] =    Variants_DF[:,λn_for * "_ciu"]
+        elseif has_name(Variants_DF, λn_rev)
+            λe_vt_vn[vn] = .- Variants_DF[:,λn_rev]
+            λl_vt_vn[vn] = .- Variants_DF[:,λn_rev * "_cil"]
+            λu_vt_vn[vn] = .- Variants_DF[:,λn_rev * "_ciu"]
+        else
+            @warn "$(vn) と $(base_variant_name) に対するロジットデータがない"
         end
     end
     # x 軸設定
-    x_axis_time!(p; start_date=start_date, end_date=end_date)
+    x_axis_time!(p; date_start=date_start, date_end=date_end)
     x_axis_lims = collect(Plots.xlims(p))
     # y 軸設定
     ytol = 0.2
-    if isnothing(ymin) ymin0 = min(0.0, reduce(min, minimum.(skipmissing.(values(v_is))))) end
-    if isnothing(ymax) ymax0 = max(0.0, reduce(max, maximum.(skipmissing.(values(v_is))))) end
+    if isnothing(ymin) ymin0 = min(0.0, reduce(min, minimum.(skipmissing.(values(λe_vt_vn))))) end
+    if isnothing(ymax) ymax0 = max(0.0, reduce(max, maximum.(skipmissing.(values(λe_vt_vn))))) end
     if isnothing(ymin) ymin = (1.0 + ytol) * ymin0 - ytol * ymax0 end
     if isnothing(ymax) ymax = (1.0 + ytol) * ymax0 - ytol * ymin0 end
     ylims!(p, ymin, ymax)
@@ -275,60 +285,62 @@ function p_variant_logit_transitions_against_base_variant(
     plot!(p, x_axis_lims, [0.0], label=:none, color=:black)
     plot!(p, x_axis_lims, [ymax]; label=:none, lc=:black)    
     # プロット
-    for var ∈ variant_names_to_be_plotted
-        if var == base_variant_name continue end
-        if var ∉ variant_names_to_be_plotted continue end
+    for vn ∈ variant_names_to_be_plotted_v
+        if vn == base_variant_name continue end
         # 回帰直線
-        bi = (logitreg_df.variant .== var) .& (logitreg_df.base_variant .== base_variant_name)
-        lrows = logitreg_df[bi,:]
-        if nrow(lrows) ≠ 1 continue end
-        α   = lrows.α_j[1]
-        β   = lrows.β_j[1]
-        ts  = date_to_value.([start_date, end_date])
-        col = varcols[var]
+        df = filter(row -> (row.variant == vn) && (row.base_variant == base_variant_name), LogitReg_DF)
+        if nrow(df) ≠ 1
+            @warn "基準株 $(base_variant_name) に対する変異株 $(vn) の回帰データが複数ある"
+        end
+        reg = df[1,:]
+        α = reg.α_j
+        β = reg.β_j
+        t_rt = date_to_value.([date_start, date_end])
+        col = VARIANT_COLORS_vn[vn]
         plot!(p,
-            ts, α .+ β .* ts,
+            t_rt, α .+ β .* t_rt,
             label=:none, color=col, alpha=0.75,
             linestyle=:dot,
         )
         # データ
-        v_i  = v_is[var]
-        I_i  = Vector{Bool}(.!(ismissing.(v_i)))
-        ts_I = ts_i[I_i]
-        te_I = te_i[I_i]
-        t_I  = t_star.(ts_I, te_I, α, β)
-        v_I  = v_i[I_i]
-        vl_I = replace(vl_is[var][I_i], -Inf => -1e8)
-        vu_I = replace(vu_is[var][I_i],  Inf =>  1e8)
+        λe_vt = λe_vt_vn[vn]
+        wt_vt = .!(ismissing.(λe_vt))
+        ts_wt = ts_vt[wt_vt]
+        te_wt = te_vt[wt_vt]
+        tc_wt = t_star.(ts_wt, te_wt, α, β)
+        λe_wt = λe_vt[wt_vt]
+        λl_wt = replace(λl_vt_vn[vn][wt_vt], -Inf => -1e8)
+        λu_wt = replace(λu_vt_vn[vn][wt_vt],  Inf =>  1e8)
         scatter!(p,
-            t_I, v_I,
-            xerror=(t_I .- ts_I, te_I .- t_I),
-            yerror=(v_I .- vl_I, vu_I .- v_I),
-            label=var, color=col, alpha=1.0,
+            tc_wt, λe_wt,
+            xerror=(tc_wt .- ts_wt, te_wt .- tc_wt),
+            yerror=(λe_wt .- λl_wt, λu_wt .- λe_wt),
+            label=vn, color=col, alpha=1.0,
             markerstrokecolor=col, edgecolor=col,
         )
     end
     # アノテーション
-    for (var, x, y) ∈ value_annotations
-        bi = (logitreg_df.variant .== var) .& (logitreg_df.base_variant .== base_variant_name)
-        lrows = logitreg_df[bi,:]
-        if nrow(lrows) == 1
-            β = lrows.β_j[1]
-            annotate!(p, x, y,
-                text(
-                    @sprintf(
-                        "%s の %s に対する\n対数増加率：%.3f /日",
-                        var, base_variant_name, β
-                    ),
-                    font("Meiryo", 9), varcols[var], :left
-                )
-            )
+    for (vn, x, y) ∈ value_annotations
+        df = filter(row -> (row.variant == vn) && (row.base_variant == base_variant_name), LogitReg_DF)
+        if nrow(df) ≠ 1
+            @warn "基準株 $(base_variant_name) に対する変異株 $(vn) の回帰データが複数ある"
         end
+        reg = df[1,:]
+        β = reg.β_j
+        annotate!(p, x, y,
+            text(
+                @sprintf(
+                    "%s の %s に対する\n対数増加率：%.3f /日",
+                    vn, base_variant_name, β
+                ),
+                font("Meiryo", 9), VARIANT_COLORS_vn[vn], :left
+            )
+        )
     end
     data_source = Dict(
         :tokyo => "東京都「新型コロナウイルス感染症モニタリング会議資料」変異株検査",
         :osaka => "大阪府「新型コロナウイルス感染症患者の発生状況について」",
-    )[region]
+    )[RegionSymbol]
     annotate!(p, rx(p, 0.35), ry(p, 0.08),
         text(
             """
@@ -362,13 +374,18 @@ end
 # グローバル変数
 P = nothing
 
-function generate(region)
+function generate(region_symbol)
     @info "========"
     @info "プロット生成"
     @info "--------"
+    @info "地域シンボル名"
+    @assert region_symbol ∈ CAPABLE_REGION_SYMBOLS
+    global RegionSymbol = region_symbol
+    @insp RegionSymbol
+    @info "--------"
     @info "データ読み込み"
-    variants_df, logitreg_df = load_jld2(input_jld2_filepaths[region])
-    @insp size(variants_df), size(logitreg_df)
+    load_jld2(INPUT_JLD2_FILEPATHS[RegionSymbol])
+    @insp size(Variants_DF), size(LogitReg_DF)
     @info "--------"
     @info "追加アノテーションのパラメーター定義"
     value_annotations_XBB_against_BA_5 = [
@@ -386,34 +403,38 @@ function generate(region)
     @info "--------"
     @info "プロット生成"
     #-------
-    @info "against_BA_5"
-    P[:against_BA_5] = p_variant_logit_transitions_against_base_variant(region, variants_df, logitreg_df;
+    s = :against_BA_5 
+    @insp s
+    P[s] = p_variant_logit_transitions_against_base_variant(
         value_annotations = value_annotations_XBB_against_BA_5,
     )
     @info "プロット書き出し"
-    filepath = figdir * "tokyo_logit_transitions"
-    @insp filepath
-    savefig(P[:against_BA_5], filepath)
+    f = FIGURE_DIRECTORY * "tokyo_logit_transitions"
+    @insp f
+    savefig(P[s], f)
     #-------
-    @info "XBB_against_BA_5"
-    P[:XBB_against_BA_5] = p_variant_logit_transitions_against_base_variant(region, variants_df, logitreg_df;
-        variant_names_to_be_plotted = ["XBB", "XBB.1.5", "XBB.1.9.1"],
+    s = :XBB_against_BA_5
+    @insp s
+    P[s] = p_variant_logit_transitions_against_base_variant(
+        variant_names_to_be_plotted_v = ["XBB", "XBB.1.5", "XBB.1.9.1"],
         value_annotations = value_annotations_XBB_against_BA_5,
     )
     #-------
-    for base_variant_name ∈ ["BF.7", "BQ.1.1", "BN.1"]
-        symbol = Symbol(replace("against_$(base_variant_name)", "." => "_"))
-        @info symbol
-        P[symbol] = p_variant_logit_transitions_against_base_variant(region, variants_df, logitreg_df;
-            base_variant_name = base_variant_name,
+    for bvn ∈ ["BF.7", "BQ.1.1", "BN.1"]
+        s = Symbol(replace("against_$(bvn)", "." => "_"))
+        @insp s
+        P[s] = p_variant_logit_transitions_against_base_variant(
+            base_variant_name = bvn,
         )
     end
     #-------
-    @info "XBB_against_XBB"
-    P[:XBB_against_XBB] = p_variant_logit_transitions_against_base_variant(region, variants_df, logitreg_df;
+    s = :XBB_against_XBB
+    @insp s
+    P[s] = p_variant_logit_transitions_against_base_variant(
         base_variant_name = "XBB.1.5",
-        variant_names_to_be_plotted = ["BA.5", "XBB", "XBB.1.9.1"],
-        start_date = Date("2023-02-15"), end_date = Date("2023-05-15"), ymin = -5.0, ymax = 1.5,
+        variant_names_to_be_plotted_v = ["BA.5", "XBB", "XBB.1.9.1"],
+        date_start = Date("2023-02-15"), date_end = Date("2023-05-15"),
+        ymin = -5.0, ymax = 1.5,
     )
     global P = P
     return P

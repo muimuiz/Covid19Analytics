@@ -90,10 +90,10 @@ LogitReg_DF = nothing
 
 # 変異株回帰 jld2 データ読み込み
 function load_jld2(filepath)
-    @info "JLD2 ファイル $filepath を読み込み、全域変数 variants_df, logitreg_df を設定"
+    @info "JLD2 ファイル $(filepath) を読み込み、全域変数 Variants_DF, LogitReg_DF を設定"
     jld2_data = load(filepath)
-    global Variants_DF = jld2_data["variants_df"]
-    global LogitReg_DF = jld2_data["logitreg_df"]
+    global Variants_DF = jld2_data["Variants_DF"]
+    global LogitReg_DF = jld2_data["LogitReg_DF"]
     @insp nrow(Variants_DF)
     @insp nrow(LogitReg_DF), names(LogitReg_DF)
 end
@@ -297,7 +297,7 @@ const COLORS = [
 
 @inline RGB256(r, g, b) = RGB(r/255, g/255, b/255)
 @insp RGB256
-const VARIANT_COLORS = Dict(
+const VARIANT_COLORS_vn = Dict(
     "BA.2"      => RGB256(236, 126,  42),
     "BA.5"      => RGB256(156, 196, 230),
     "BF.7"      => RGB256(255, 192,   0),
@@ -310,7 +310,7 @@ const VARIANT_COLORS = Dict(
     "XBB.1.9.1" => RGB256( 84, 132,  52),
     "XBB+1.9.1" => RGB256( 98,  88, 106),
 )
-@insp length(VARIANT_COLORS)
+@insp length(VARIANT_COLORS_vn)
 
 @info "========"
 @info "プロット用関数定義"
@@ -338,9 +338,9 @@ function x_axis_time!(
 )
     if !isnothing(recent) date_start = max(date_start, date_end - Day(recent)) end 
     @insp date_start, date_end
-    tval_start = dtime_to_value(DateTime(date_start))
-    tval_end   = dtime_to_value(DateTime(date_end))
-    xlims!(p, tval_start, tval_end)
+    tvalue_start = dtime_to_value(DateTime(date_start))
+    tvalue_end   = dtime_to_value(DateTime(date_end))
+    xlims!(p, tvalue_start, tvalue_end)
     if isa(p, Plots.Plot)
         days = date_end - date_start
         if     days < Day(14)
@@ -365,7 +365,7 @@ function x_axis_time!(
         labels = String[]
         for d in sort(collect(keys(ticks_dict)))
             t = dtime_to_value(DateTime(d) + Hour(12))
-            if tval_start ≤ t ≤ tval_end
+            if tvalue_start ≤ t ≤ tvalue_end
                 push!(ts, t)
                 push!(labels, ticks_dict[d])
             end
@@ -503,7 +503,7 @@ function p_stacked_area_variant_proportions(
     # プロット
     stacked_area!(
         p, PREDICTION_TVALUES_pt, p_pt_vr;
-        lc=:black, fcs=[VARIANT_COLORS[var] for var ∈ vn_vr],
+        lc=:black, fcs=[VARIANT_COLORS_vn[vn] for vn ∈ vn_vr],
     )
     for g ∈ 1:VARIANT_NAMES_NUM_OF_GENERATIONS
         for vr ∈ 1:(length(VARIANT_NAMES_v_g[g])-1)
