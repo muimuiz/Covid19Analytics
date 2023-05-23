@@ -45,6 +45,7 @@ const VARIANT_NAMES_v_g = [
     ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB_old"],
     ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB+1.9.1"],
     ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB.1.9.1", "XBB"],
+    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB.1.9.1", "XBB.1.16", "XBB"],
 ]
 const VARIANT_NAMES_NUM_OF_GENERATIONS = length(VARIANT_NAMES_v_g)
 const VARIANT_NAMES_LATEST_v = VARIANT_NAMES_v_g[VARIANT_NAMES_NUM_OF_GENERATIONS]
@@ -257,9 +258,9 @@ end
 
 @info "========"
 @info ""
-@info "Variants_Pred.run(region) として実行する"
-@info "region はシンボル :tokyo または :osaka"
-@info "module 内全域変数 pred_loggrowth が設定される"
+@info "Variants_Pred.run(region_symbol) として実行する"
+@info "region_symbol はシンボル :tokyo または :osaka"
+@info "module 内全域変数が設定される"
 @info ""
 @info "========"
 
@@ -308,6 +309,7 @@ const VARIANT_COLORS_vn = Dict(
     "XBB"       => RGB256(132, 152, 176),
     "XBB.1.5"   => RGB256(112,  44, 160),
     "XBB.1.9.1" => RGB256( 84, 132,  52),
+    "XBB.1.16"  => RGB256(128,  96,   0),
     "XBB+1.9.1" => RGB256( 98,  88, 106),
 )
 @insp length(VARIANT_COLORS_vn)

@@ -53,6 +53,7 @@ const VARIANT_NAMES_TO_BE_PLOTTED_v = [
     "XBB",
     "XBB.1.5",
     "XBB.1.9.1",
+    "XBB.1.16",
     "XBB+1.9.1",
 ]
 @insp VARIANT_NAMES_TO_BE_PLOTTED_v
@@ -92,6 +93,7 @@ const VARIANT_COLORS_vn = Dict(
     "XBB"       => RGB256(132, 152, 176),
     "XBB.1.5"   => RGB256(112,  44, 160),
     "XBB.1.9.1" => RGB256( 84, 132,  52),
+    "XBB.1.16"  => RGB256(128,  96,   0),
     "XBB+1.9.1" => RGB256( 98,  88, 106),
 )
 @insp length(VARIANT_COLORS_vn)
@@ -270,25 +272,30 @@ function p_variant_logit_transitions_against_base_variant(;
     end
     # x 軸設定
     x_axis_time!(p; date_start=date_start, date_end=date_end)
-    x_axis_lims = collect(Plots.xlims(p))
+    x_lims = collect(Plots.xlims(p))
     # y 軸設定
     ytol = 0.2
     if isnothing(ymin) ymin0 = min(0.0, reduce(min, minimum.(skipmissing.(values(λe_vt_vn))))) end
     if isnothing(ymax) ymax0 = max(0.0, reduce(max, maximum.(skipmissing.(values(λe_vt_vn))))) end
     if isnothing(ymin) ymin = (1.0 + ytol) * ymin0 - ytol * ymax0 end
     if isnothing(ymax) ymax = (1.0 + ytol) * ymax0 - ytol * ymin0 end
+    @insp ymin, ymax
     ylims!(p, ymin, ymax)
     y_ticks = yticks(p)[1][1]
     ylabel!(p, "$(base_variant_name) 株の検出数に対する他の株の検出数の比の自然対数（ロジット）")
     # グリッド線と上辺をプロットの要素として重ね書き（twinx() のバクにより消されるため）
-    map(y -> if y ≠ 0 plot!(p, x_axis_lims, [y]; label=:none, lc=:gray90) end, y_ticks)
-    plot!(p, x_axis_lims, [0.0], label=:none, color=:black)
-    plot!(p, x_axis_lims, [ymax]; label=:none, lc=:black)    
+    map(y -> if y ≠ 0 plot!(p, x_lims, [y]; label=:none, lc=:gray90) end, y_ticks)
+    plot!(p, x_lims, [0.0], label=:none, color=:black)
+    plot!(p, x_lims, [ymax]; label=:none, lc=:black)    
     # プロット
     for vn ∈ variant_names_to_be_plotted_v
         if vn == base_variant_name continue end
         # 回帰直線
         df = filter(row -> (row.variant == vn) && (row.base_variant == base_variant_name), LogitReg_DF)
+        if nrow(df) == 0
+            @warn "基準株 $(base_variant_name) に対する変異株 $(vn) の回帰データがない"
+            continue
+        end
         if nrow(df) ≠ 1
             @warn "基準株 $(base_variant_name) に対する変異株 $(vn) の回帰データが複数ある"
         end
@@ -416,11 +423,11 @@ function generate(region_symbol)
     s = :XBB_against_BA_5
     @insp s
     P[s] = p_variant_logit_transitions_against_base_variant(
-        variant_names_to_be_plotted_v = ["XBB", "XBB.1.5", "XBB.1.9.1"],
+        variant_names_to_be_plotted_v = ["XBB", "XBB.1.5", "XBB.1.9.1", "XBB.1.16"],
         value_annotations = value_annotations_XBB_against_BA_5,
     )
     #-------
-    for bvn ∈ ["BF.7", "BQ.1.1", "BN.1"]
+    for bvn ∈ ["BF.7", "BQ.1.1"]
         s = Symbol(replace("against_$(bvn)", "." => "_"))
         @insp s
         P[s] = p_variant_logit_transitions_against_base_variant(
@@ -432,8 +439,8 @@ function generate(region_symbol)
     @insp s
     P[s] = p_variant_logit_transitions_against_base_variant(
         base_variant_name = "XBB.1.5",
-        variant_names_to_be_plotted_v = ["BA.5", "XBB", "XBB.1.9.1"],
-        date_start = Date("2023-02-15"), date_end = Date("2023-05-15"),
+        variant_names_to_be_plotted_v = ["BA.5", "XBB", "XBB.1.9.1", "XBB.1.16"],
+        date_start = Date("2023-02-15"), date_end = Date("2023-06-15"),
         ymin = -5.0, ymax = 1.5,
     )
     global P = P

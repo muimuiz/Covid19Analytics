@@ -76,6 +76,7 @@ const VARIANT_NAMES_v = [
     "XBB_old",
     "XBB.1.5",
     "XBB.1.9.1",
+    "XBB.1.16",
     "XBB+1.9.1",
     "XBB",
 ]
