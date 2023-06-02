@@ -73,12 +73,14 @@ const VARIANT_NAMES_v = [
     "BN.1",
     "BQ.1",
     "BQ.1.1",
-    "XBB_old",
     "XBB.1.5",
     "XBB.1.9.1",
+    "XBB.1.9.2",
     "XBB.1.16",
-    "XBB+1.9.1",
+    "XBB.1.16 (transient-free)",
     "XBB",
+    "XBB+1.5+1.9.1+1.9.2+1.16",
+    "XBB+1.9.1+1.9.2+1.16",
 ]
 @insp VARIANT_NAMES_v
 
@@ -295,12 +297,8 @@ end
 
 LogitReg_DF = nothing
 
-# 2株間の回帰パラメーター探索
-function logitreg_pair(vn1, vn2; method=:glm_julia)
-    @info "--------"
-    @info "$(vn1), $(vn2) 間、ロジスティック回帰パラメーター探索 ($(method))"
-    @info "--------"
-    @info "対象行の抜き出し"
+function varpair(vn1, vn2)
+    @info "$(vn1), $(vn2) 間、対象データの抜き出し"
     df = DataFrame()
     df.ts_vt = date_to_value.(Variants_DF.date_start; noon=false)
     df.te_vt = date_to_value.(Variants_DF.date_end;   noon=false) .+ 1.0
@@ -309,8 +307,16 @@ function logitreg_pair(vn1, vn2; method=:glm_julia)
     df.n_vt  = df.k1_vt .+ df.k2_vt
     dropmissing!(df, :n_vt)
     filter!(row -> row.n_vt ≠ 0, df)
+    @insp nrow(df)
+    return df
+end
+
+# 2株間の回帰パラメーター探索
+function logitreg_pair(df; method=:glm_julia)
+    @info "--------"
+    @info "ロジスティック回帰パラメーター探索 ($(method))"
+    @info "--------"
     n_row = nrow(df)
-    @insp n_row
     @assert n_row ≥ 2
     df.tc_vt   = (df.ts_vt .+ df.te_vt) ./ 2.0
     df.p_vt    = df.k1_vt ./ df.n_vt
@@ -378,9 +384,11 @@ function logitreg()
         for vn ∈ VARIANT_NAMES_v
             if !has_name(Variants_DF, vn) continue end
             if bvn == vn continue end
-            α_j, β_j, slope_j, β_ci_j = logitreg_pair(vn, bvn; method=:glm_julia)
-            α_r, β_r, slope_r, β_ci_r = logitreg_pair(vn, bvn; method=:glm_r)
-            α_s, β_s, slope_s, β_ci_s = logitreg_pair(vn, bvn; method=:nrm)
+            pdf = varpair(vn, bvn)
+            if nrow(pdf) < 2 continue end
+            α_j, β_j, slope_j, β_ci_j = logitreg_pair(pdf; method=:glm_julia)
+            α_r, β_r, slope_r, β_ci_r = logitreg_pair(pdf; method=:glm_r)
+            α_s, β_s, slope_s, β_ci_s = logitreg_pair(pdf; method=:nrm)
             push!(df, [
                 vn, bvn,
                 α_j, β_j, slope_j, β_ci_j,

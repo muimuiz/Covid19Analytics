@@ -42,15 +42,17 @@ const CONFIRMED_CSV_FILEPATHS = Dict(
 @info "対象となる変異株名（区分は度々変更されるため区分の世代別）"
 
 const VARIANT_NAMES_v_g = [
-    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB_old"],
-    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB+1.9.1"],
-    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB.1.9.1", "XBB"],
-    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB.1.9.1", "XBB.1.16", "XBB"],
+    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB+1.5+1.9.1+1.9.2+1.16"],
+    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB+1.9.1+1.9.2+1.16"],
+    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB.1.9.1", "XBB.1.9.2", "XBB.1.16 (transient-free)", "XBB"],
 ]
 const VARIANT_NAMES_NUM_OF_GENERATIONS = length(VARIANT_NAMES_v_g)
 const VARIANT_NAMES_LATEST_v = VARIANT_NAMES_v_g[VARIANT_NAMES_NUM_OF_GENERATIONS]
+const VARIANT_NAMES_LATEST2_v =
+    ["BA.2", "BA.2.75", "BA.5", "BF.7", "BN.1", "BQ.1", "BQ.1.1", "XBB.1.5", "XBB.1.9.1", "XBB.1.9.2", "XBB.1.16 (transient-free)", "XBB"]
 @insp VARIANT_NAMES_NUM_OF_GENERATIONS
 @insp VARIANT_NAMES_LATEST_v
+@insp VARIANT_NAMES_LATEST2_v
 
 @info "基準変異株名"
 const BASE_VARIANT_NAME = "BA.5"
@@ -309,8 +311,9 @@ const VARIANT_COLORS_vn = Dict(
     "XBB"       => RGB256(132, 152, 176),
     "XBB.1.5"   => RGB256(112,  44, 160),
     "XBB.1.9.1" => RGB256( 84, 132,  52),
+    "XBB.1.9.2" => RGB256(104, 142, 208),
     "XBB.1.16"  => RGB256(128,  96,   0),
-    "XBB+1.9.1" => RGB256( 98,  88, 106),
+    "XBB.1.16 (transient-free)" => RGB256(128,  96,   0),
 )
 @insp length(VARIANT_COLORS_vn)
 
@@ -439,6 +442,13 @@ function p_log_growth_comparison(
         p, ConfirmedTValues_ct, ConfirmedLGrowths_ct;
         label="感染確認者数にもとづく実際の対数増加率",
         la=0.8, lc=COLORS[3], lw=2
+    )
+    scatter!(
+        p,
+        date_to_value.([Date("2023-05-15"), Date("2023-05-22")]),
+        [0.0551, 0.0164],
+        label="定点患者報告数にもとづく対数増加率",
+        m=:square, color=COLORS[6], edgecolor=COLORS[6],
     )
     plot!(
         p, PREDICTION_TVALUES_pt, PredictedLGrowths_pt;

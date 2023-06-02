@@ -303,7 +303,7 @@ function p_log_sentinel_and_confirmed(;
     # 凡例ラベル（順序を保証するため空のプロットでまとめて登録する）
     plot!(p, [], []; label="日別感染確認者数（公表日）", la=0.2, lc=C[:x], m=:circle, mc=C[:x])
     plot!(p, [], []; label="トレンド（曜日・休日補正、LOESS 平滑化）", lc=C[:zs])
-    scatter!(p, [], []; label="定点感染報告者数（右目盛り）", lc=C[:xm], m=:square, color=C[:xm], markerstrokecolor=C[:xm], edgecolor=C[:xm])
+    scatter!(p, [], []; label="定点感染報告者数（右目盛り）", lc=C[:ξm], m=:square, color=C[:ξm], edgecolor=C[:ξm])
     # データ
     t_ct   = cdf.tvalue
     lx_ct  = log.(cdf.confirmed)
@@ -319,7 +319,7 @@ function p_log_sentinel_and_confirmed(;
         m=:square,
         xerror=(t_st .- ts_st, te_st .- t_st),
         yerror=([log(1.1)], [log(1.1)]),
-        label=:none, color=C[:xm], markerstrokecolor=C[:xm], edgecolor=C[:xm]
+        label=:none, color=C[:ξm], edgecolor=C[:ξm]
     )
     # アノテーション
     data_source = Dict(
@@ -330,8 +330,8 @@ function p_log_sentinel_and_confirmed(;
             """
             データソース：$(data_source).
             2023-05-08 までの日別データは、厚労省 新規陽性者数の推移（日別）より.
-            データが重なる範囲において両者をフィッティングし、定点データの値を $(@sprintf("%.1f", exp(-LogRatio))) 倍した.
-            縦軸エラーバーは、定点データの誤差目安に合わせて一律 10% の幅を示している.
+            データが重なる範囲においてフィッティングし、定点データの値を $(@sprintf("%.1f", exp(-LogRatio))) 倍した.
+            縦軸エラーバーは、定点データの誤差目安に合わせて一律 ±10% の幅を示している.
             """,
             font("Meiryo", 6), RGB(0.3,0.3,0.3), :left
         )

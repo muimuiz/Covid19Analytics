@@ -53,8 +53,9 @@ const VARIANT_NAMES_TO_BE_PLOTTED_v = [
     "XBB",
     "XBB.1.5",
     "XBB.1.9.1",
+    "XBB.1.9.2",
     "XBB.1.16",
-    "XBB+1.9.1",
+#    "XBB+XBB.1.9.1+XBB.1.9.2+XBB.1.16",
 ]
 @insp VARIANT_NAMES_TO_BE_PLOTTED_v
 
@@ -93,8 +94,10 @@ const VARIANT_COLORS_vn = Dict(
     "XBB"       => RGB256(132, 152, 176),
     "XBB.1.5"   => RGB256(112,  44, 160),
     "XBB.1.9.1" => RGB256( 84, 132,  52),
+    "XBB.1.9.2" => RGB256(104, 142, 208),
     "XBB.1.16"  => RGB256(128,  96,   0),
-    "XBB+1.9.1" => RGB256( 98,  88, 106),
+    "XBB.1.16 (transient-free)"  => RGB256(128,  96,   0),
+#    "XBB+XBB.1.9.1+XBB.1.9.2+XBB.1.16" => RGB256( 98,  88, 106),
 )
 @insp length(VARIANT_COLORS_vn)
 
@@ -348,7 +351,7 @@ function p_variant_logit_transitions_against_base_variant(;
         :tokyo => "東京都「新型コロナウイルス感染症モニタリング会議資料」変異株検査",
         :osaka => "大阪府「新型コロナウイルス感染症患者の発生状況について」",
     )[RegionSymbol]
-    annotate!(p, rx(p, 0.35), ry(p, 0.08),
+    annotate!(p, rx(p, 0.35), ry(p, 0.05),
         text(
             """
             データソース：$(data_source)
@@ -356,8 +359,6 @@ function p_variant_logit_transitions_against_base_variant(;
             (2 株間の比は感染者数の増減によらずおよそ直線的に推移することが知られている).
             縦軸エラーバーは二項分布を仮定したときの 95% 信頼区間を示す.
             点線は二項分布の最尤推定により求めたパラメーターにもとづく回帰直線.
-            枝番のない XBB は XBB.1.5 と 1.9.1 を除いた XBB 系統の株を,
-            XBB+1.9.1 は XBB.1.5 のみを除いた XBB 系統の株を表す.
             """,
             font("Meiryo", 6), RGB(0.3,0.3,0.3), :left
         )
@@ -397,7 +398,7 @@ function generate(region_symbol)
     @info "追加アノテーションのパラメーター定義"
     value_annotations_XBB_against_BA_5 = [
         ("XBB.1.5",   date_to_value(Date("2023-02-01")), -5.5),
-        ("XBB+1.9.1", date_to_value(Date("2023-03-01")), -3.5)
+#        ("XBB+XBB.1.9.1+XBB.1.9.2+XBB.1.16", date_to_value(Date("2023-03-01")), -3.5)
     ]
     @info "--------"
     @info "Plots 初期化"
@@ -439,9 +440,14 @@ function generate(region_symbol)
     @insp s
     P[s] = p_variant_logit_transitions_against_base_variant(
         base_variant_name = "XBB.1.5",
-        variant_names_to_be_plotted_v = ["BA.5", "XBB", "XBB.1.9.1", "XBB.1.16"],
+        variant_names_to_be_plotted_v = ["BA.5", "XBB", "XBB.1.9.1", "XBB.1.9.2", "XBB.1.16", "XBB.1.16 (transient-free)"],
         date_start = Date("2023-02-15"), date_end = Date("2023-06-15"),
-        ymin = -5.0, ymax = 1.5,
+        ymin = -5.0, ymax = 3.0,
+        value_annotations = [
+            ("XBB.1.16", date_to_value(Date("2023-04-01")),  2.5),
+            ("XBB.1.16 (transient-free)", date_to_value(Date("2023-04-01")),  1.5),
+            ("BA.5",     date_to_value(Date("2023-05-10")), -3.0),
+        ],
     )
     global P = P
     return P
