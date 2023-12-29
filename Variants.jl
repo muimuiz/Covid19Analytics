@@ -66,6 +66,12 @@ const OUTPUT_JLD2_FILEPATHS = Dict(
 @info "--------"
 @info "対象となる変異株名"
 const VARIANT_NAMES_v = [
+    "EG.5",
+    "JN.1",
+    "BA.2.86",
+    "XBB.2.3",
+    "others",
+#=
     "BA.2",
     "BA.2.75",
     "BA.5",
@@ -81,16 +87,20 @@ const VARIANT_NAMES_v = [
     "XBB",
     "XBB+1.5+1.9.1+1.9.2+1.16",
     "XBB+1.9.1+1.9.2+1.16",
+=#
 ]
 @insp VARIANT_NAMES_v
 
 @info "比較基準となる変異株名"
 const BASE_VARIANT_NAMES_bv = [
+    "EG.5",
+#=
     "BA.5",
     "BF.7",
     "BN.1",
     "BQ.1.1",
     "XBB.1.5",
+=#
 ]
 @insp BASE_VARIANT_NAMES_bv
 @assert BASE_VARIANT_NAMES_bv ⊆ VARIANT_NAMES_v
@@ -98,8 +108,12 @@ const BASE_VARIANT_NAMES_bv = [
 @info "--------"
 @info "予測させる時刻範囲"
 
+const PREDICTION_DATE_START = Date("2023-11-01")
+const PREDICTION_DATE_END   = Date("2024-03-01")
+#=
 const PREDICTION_DATE_START = Date("2022-11-01")
 const PREDICTION_DATE_END   = Date("2023-07-01")
+=#
 @insp PREDICTION_DATE_START, PREDICTION_DATE_END
 const PREDICTION_DATES_pt   = PREDICTION_DATE_START:Day(1):PREDICTION_DATE_END
 const PREDICTION_TVALUES_pt = date_to_value.(PREDICTION_DATES_pt)

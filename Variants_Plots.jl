@@ -43,6 +43,8 @@ const INPUT_JLD2_FILEPATHS = Dict(
 @info "プロットする変異株"
 
 const VARIANT_NAMES_TO_BE_PLOTTED_v = [
+    "JN.1",
+#=
 #    "BA.2",
 #    "BA.2.75",
     "BA.5",
@@ -56,14 +58,19 @@ const VARIANT_NAMES_TO_BE_PLOTTED_v = [
     "XBB.1.9.2",
     "XBB.1.16",
 #    "XBB+XBB.1.9.1+XBB.1.9.2+XBB.1.16",
+=#
 ]
 @insp VARIANT_NAMES_TO_BE_PLOTTED_v
 
 @info "--------"
 @info "プロット時間範囲"
 
+const PLOT_DATE_START = Date("2023-10-31")
+const PLOT_DATE_END   = Date("2024-03-02")
+#=
 const PLOT_DATE_START = Date("2022-10-31")
 const PLOT_DATE_END   = Date("2023-06-02")
+=#
 @insp PLOT_DATE_START, PLOT_DATE_END
 
 @info "--------"
@@ -84,6 +91,12 @@ const FIGURE_DIRECTORY = "CurrentFigs/"
 @inline RGB256(r, g, b) = RGB(r/255, g/255, b/255)
 @insp RGB256
 const VARIANT_COLORS_vn = Dict(
+    "EG.5"    => RGB256(255, 124, 128),
+    "JN.1"    => RGB256(155,  45, 163),
+    "BA.2.86" => RGB256(188,  20, 120),
+    "XBB.2.3" => RGB256(140, 193, 104),
+    "others"  => RGB256(128, 128, 128),
+#=
     "BA.2"      => RGB256(236, 126,  42),
     "BA.5"      => RGB256(156, 196, 230),
     "BF.7"      => RGB256(255, 192,   0),
@@ -98,6 +111,7 @@ const VARIANT_COLORS_vn = Dict(
     "XBB.1.16"  => RGB256(128,  96,   0),
     "XBB.1.16 (transient-free)"  => RGB256(128,  96,   0),
 #    "XBB+XBB.1.9.1+XBB.1.9.2+XBB.1.16" => RGB256( 98,  88, 106),
+=#
 )
 @insp length(VARIANT_COLORS_vn)
 
@@ -232,7 +246,7 @@ end
 @info "基準株に対する他の株のロジットの時間推移プロット関数"
 
 function p_variant_logit_transitions_against_base_variant(;
-    base_variant_name = "BA.5",
+    base_variant_name = "EG.5", #"BA.5",
     variant_names_to_be_plotted_v = VARIANT_NAMES_TO_BE_PLOTTED_v,
     date_start = PLOT_DATE_START,
     date_end   = PLOT_DATE_END,
@@ -277,7 +291,8 @@ function p_variant_logit_transitions_against_base_variant(;
     x_axis_time!(p; date_start=date_start, date_end=date_end)
     x_lims = collect(Plots.xlims(p))
     # y 軸設定
-    ytol = 0.2
+    @insp λe_vt_vn
+    ytol = 1.0 #0.2
     if isnothing(ymin) ymin0 = min(0.0, reduce(min, minimum.(skipmissing.(values(λe_vt_vn))))) end
     if isnothing(ymax) ymax0 = max(0.0, reduce(max, maximum.(skipmissing.(values(λe_vt_vn))))) end
     if isnothing(ymin) ymin = (1.0 + ytol) * ymin0 - ytol * ymax0 end
@@ -364,6 +379,7 @@ function p_variant_logit_transitions_against_base_variant(;
         )
     )
     # 右 y 軸
+    #=
     p2 = twinx(p)
     ylims!(p2, ymin, ymax)
     y2_eticks = (function(emin, emax)
@@ -372,6 +388,7 @@ function p_variant_logit_transitions_against_base_variant(;
     end)(exp(ymin), exp(ymax))
     yticks!(p2, log.(y2_eticks), map(v -> (@sprintf("%g", v) * " "^5)[1:5], y2_eticks))
     ylabel!(p2, "$(base_variant_name) 株の検出数に対する他の株の検出数の比（オッズ、対数目盛り）")
+    =#
     return p
 end
 @info p_variant_logit_transitions_against_base_variant
@@ -396,6 +413,9 @@ function generate(region_symbol)
     @insp size(Variants_DF), size(LogitReg_DF)
     @info "--------"
     @info "追加アノテーションのパラメーター定義"
+    value_annotations_JN_1_against_EG_5 = [
+        ("JN.1",   date_to_value(Date("2023-12-10")), -2.0),
+    ]
     value_annotations_XBB_against_BA_5 = [
         ("XBB.1.5",   date_to_value(Date("2023-02-01")), -5.5),
 #        ("XBB+XBB.1.9.1+XBB.1.9.2+XBB.1.16", date_to_value(Date("2023-03-01")), -3.5)
@@ -410,6 +430,17 @@ function generate(region_symbol)
     P = Dict{Symbol, Plots.Plot}()
     @info "--------"
     @info "プロット生成"
+    #-------
+    s = :against_EG_5 
+    @insp s
+    P[s] = p_variant_logit_transitions_against_base_variant(
+        value_annotations = value_annotations_JN_1_against_EG_5,
+    )
+    @info "プロット書き出し"
+    f = FIGURE_DIRECTORY * "tokyo_logit_transitions.png"
+    @insp f
+    savefig(P[s], f)
+    #=
     #-------
     s = :against_BA_5 
     @insp s
@@ -449,6 +480,7 @@ function generate(region_symbol)
             ("BA.5",     date_to_value(Date("2023-05-10")), -3.0),
         ],
     )
+    =#
     global P = P
     return P
 end
